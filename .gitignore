@@ -1,0 +1,44 @@
+# Claude Code ローカル設定（個人設定はGit管理外）
+.claude/settings.local.json
+
+# MCP APIキー・認証情報（機密情報）
+.mcp.json
+.mcp.local.json
+_credentials.py
+.env
+.env.*
+!.env.example
+
+# クライアント機密情報（個人情報・予算・契約情報）
+company/clients/*/confidential/
+company/clients/*/_private/
+company/projects/*/budget/
+company/projects/*/contracts/
+
+# OS生成ファイル
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# エディタ・IDE
+.vscode/settings.json
+.idea/
+*.swp
+*.swo
+
+# ログ・一時ファイル
+*.log
+tmp/
+temp/
+.tmp/
+
+# Node.js
+node_modules/
+npm-debug.log*
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+venv/

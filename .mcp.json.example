@@ -1,0 +1,28 @@
+{
+  "mcpServers": {
+    "chatwork": {
+      "command": "C:\\Program Files\\nodejs\\node.exe",
+      "args": ["C:\\Users\\<USERNAME>\\AppData\\Roaming\\npm\\node_modules\\@chatwork\\mcp-server\\dist\\index.js"],
+      "env": {
+        "CHATWORK_API_TOKEN": "YOUR_CHATWORK_API_TOKEN"
+      }
+    },
+    "google-workspace": {
+      "command": "C:\\Users\\<USERNAME>\\AppData\\Local\\Python\\pythoncore-3.14-64\\Scripts\\uvx.exe",
+      "args": [
+        "--with", "pytz",
+        "workspace-mcp",
+        "--single-user",
+        "--tools", "drive", "calendar", "docs", "sheets",
+        "slides", "forms", "tasks", "contacts", "chat",
+        "search", "appscript", "gmail"
+      ],
+      "env": {
+        "GOOGLE_OAUTH_CLIENT_ID": "YOUR_GOOGLE_OAUTH_CLIENT_ID",
+        "GOOGLE_OAUTH_CLIENT_SECRET": "YOUR_GOOGLE_OAUTH_CLIENT_SECRET",
+        "OAUTHLIB_INSECURE_TRANSPORT": "1",
+        "USER_GOOGLE_EMAIL": "your-email@example.com"
+      }
+    }
+  }
+}
