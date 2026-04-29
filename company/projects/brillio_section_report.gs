@@ -576,25 +576,34 @@ function debugSectionApi() {
   Logger.log('テストCPN: ' + testCampId + ' (' + campaignMap[testCampId] + ')');
 
   var tests = [
+    // periodicなしエンドポイント
     {
-      label: 'publishers/periodic（マーケター全体）',
+      label: 'publishers（periodicなし・マーケター全体）',
       url: BASE_URL + '/reports/marketers/' + marketerId +
-           '/publishers/periodic?from=' + from + '&to=' + to + '&limit=5'
+           '/publishers?from=' + from + '&to=' + to + '&limit=5'
     },
     {
-      label: 'campaigns/periodic?breakdown=section（マーケター全体）',
+      label: 'publishers + breakdown=daily（マーケター全体）',
       url: BASE_URL + '/reports/marketers/' + marketerId +
-           '/campaigns/periodic?from=' + from + '&to=' + to + '&breakdown=section&limit=5'
+           '/publishers?from=' + from + '&to=' + to + '&breakdown=daily&limit=5'
     },
+    // sectionsエンドポイント
     {
-      label: 'campaigns/periodic?breakdown=publisher（マーケター全体）',
+      label: 'sections（マーケター全体）',
       url: BASE_URL + '/reports/marketers/' + marketerId +
-           '/campaigns/periodic?from=' + from + '&to=' + to + '&breakdown=publisher&limit=5'
+           '/sections?from=' + from + '&to=' + to + '&limit=5'
     },
+    // CPN単位のperiodicなし
     {
-      label: 'publishers/periodic（CPN別）',
+      label: 'publishers（periodicなし・CPN別）',
       url: BASE_URL + '/reports/marketers/' + marketerId + '/campaigns/' + testCampId +
-           '/publishers/periodic?from=' + from + '&to=' + to + '&limit=5'
+           '/publishers?from=' + from + '&to=' + to + '&limit=5'
+    },
+    // v0.1以外のパス候補
+    {
+      label: 'publishers/periodic + breakdown=daily（マーケター全体）',
+      url: BASE_URL + '/reports/marketers/' + marketerId +
+           '/publishers/periodic?from=' + from + '&to=' + to + '&breakdown=daily&limit=5'
     }
   ];
 

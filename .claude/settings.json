@@ -8,6 +8,7 @@
       "Bash(cat:*)",
       "Bash(echo:*)",
       "Bash(git:*)",
+      "Bash(start:*)",
       "Bash(npm:*)",
       "Bash(node:*)",
       "Bash(python:*)",
