@@ -1,0 +1,548 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CPA シミュレーター</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: 'Segoe UI', 'Hiragino Sans', sans-serif;
+    background: #0d1b3e;
+    min-height: 100vh;
+    padding: 24px 16px;
+    color: #1a1a2e;
+  }
+  h1 {
+    text-align: center;
+    font-size: 1.4rem;
+    font-weight: 700;
+    color: #ffffff;
+    margin-bottom: 16px;
+    letter-spacing: 0.05em;
+  }
+
+  /* タブ */
+  .tabs {
+    display: flex;
+    justify-content: center;
+    gap: 8px;
+    margin-bottom: 24px;
+  }
+  .tab-btn {
+    padding: 10px 32px;
+    border-radius: 999px;
+    border: 2px solid rgba(255,255,255,0.2);
+    background: transparent;
+    color: rgba(255,255,255,0.5);
+    font-size: 0.95rem;
+    font-weight: 700;
+    cursor: pointer;
+    letter-spacing: 0.05em;
+    transition: all 0.18s;
+  }
+  .tab-btn:hover { border-color: rgba(255,255,255,0.5); color: rgba(255,255,255,0.8); }
+  .tab-btn.active {
+    background: #ffffff;
+    border-color: #ffffff;
+    color: #0d1b3e;
+  }
+  .layout {
+    display: grid;
+    grid-template-columns: 1fr 1.4fr;
+    gap: 16px;
+    max-width: 960px;
+    margin: 0 auto;
+  }
+  @media (max-width: 680px) { .layout { grid-template-columns: 1fr; } }
+
+  .card {
+    background: #fff;
+    border-radius: 16px;
+    padding: 20px;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.25);
+    margin-bottom: 16px;
+  }
+  .card:last-child { margin-bottom: 0; }
+  .card-title {
+    font-size: 0.72rem;
+    font-weight: 700;
+    color: #999;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    margin-bottom: 16px;
+  }
+  .field { margin-bottom: 12px; }
+  label { display: block; font-size: 0.8rem; color: #555; margin-bottom: 4px; font-weight: 500; }
+  input[type="number"] {
+    width: 100%;
+    padding: 9px 12px;
+    border: 1.5px solid #e0e0e0;
+    border-radius: 8px;
+    font-size: 0.95rem;
+    outline: none;
+    transition: border-color 0.2s;
+  }
+  input[type="number"]:focus { border-color: #5b6fff; }
+
+  /* Sliders */
+  .slider-row { margin-bottom: 14px; }
+  .slider-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px; }
+  .slider-name { font-size: 0.8rem; color: #555; font-weight: 500; }
+  .slider-badge {
+    font-size: 1rem; font-weight: 800; color: #5b6fff;
+    min-width: 72px; text-align: right;
+  }
+  input[type="range"] { width: 100%; accent-color: #5b6fff; cursor: pointer; }
+  .slider-sub { display: flex; justify-content: space-between; font-size: 0.7rem; color: #ccc; margin-top: 2px; }
+  .slider-num {
+    margin-top: 5px; width: 100%; padding: 6px 10px;
+    border: 1.5px solid #e0e0e0; border-radius: 7px;
+    font-size: 0.88rem; outline: none;
+  }
+  .cpa-derived {
+    display: flex; justify-content: space-between; align-items: center;
+    background: #f3f4ff; border-radius: 8px; padding: 8px 12px; margin-top: 4px;
+    font-size: 0.78rem; color: #555;
+  }
+  .cpa-derived strong { color: #5b6fff; font-size: 1rem; }
+
+  /* ── 右パネル ── */
+  .budget-input-row {
+    display: flex; align-items: center; gap: 10px; margin-bottom: 16px;
+  }
+  .budget-input-row label { margin-bottom: 0; white-space: nowrap; font-size: 0.85rem; color: #333; font-weight: 600; }
+  .budget-input-row input { flex: 1; }
+
+  /* 最終サマリー */
+  .summary-grid {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 14px;
+  }
+  .summary-box {
+    border-radius: 12px; padding: 14px 16px;
+  }
+  .summary-box.total-spend { background: #eef0ff; }
+  .summary-box.final-cpa   { background: #fff4e0; }
+  .summary-box .s-label { font-size: 0.72rem; font-weight: 700; color: #888; margin-bottom: 4px; }
+  .summary-box .s-val   { font-size: 1.7rem; font-weight: 900; line-height: 1.1; }
+  .summary-box.total-spend .s-val { color: #3730a3; }
+  .summary-box.final-cpa   .s-val { color: #b45309; }
+  .summary-box.final-cpa   .s-val.good { color: #15803d; }
+  .summary-box.final-cpa   .s-val.bad  { color: #b91c1c; }
+  .summary-box .s-sub { font-size: 0.72rem; color: #aaa; margin-top: 4px; }
+
+  /* CPA 比較3列 */
+  .cpa-compare {
+    display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; margin-bottom: 12px;
+  }
+  .cpa-col {
+    background: #f7f8fb; border-radius: 10px; padding: 12px 10px; text-align: center;
+  }
+  .cpa-col .cc-label { font-size: 0.68rem; color: #888; font-weight: 600; margin-bottom: 6px; line-height: 1.3; }
+  .cpa-col .cc-val   { font-size: 1.15rem; font-weight: 800; color: #1a1a2e; }
+  .cpa-col .cc-val.good { color: #15803d; }
+  .cpa-col .cc-val.bad  { color: #b91c1c; }
+  .cpa-col .cc-val.warn { color: #d97706; }
+  .cpa-col .cc-sub { font-size: 0.65rem; color: #bbb; margin-top: 3px; }
+  .cpa-col.accent { background: #eef0ff; }
+  .cpa-col.accent .cc-label { color: #5b6fff; }
+
+  /* ステータスバナー */
+  .banner {
+    border-radius: 10px; padding: 11px 14px;
+    font-size: 0.83rem; font-weight: 600; text-align: center;
+  }
+  .banner.ok   { background: #dcfce7; color: #166534; }
+  .banner.ng   { background: #fee2e2; color: #991b1b; }
+  .banner.warn { background: #fef3c7; color: #92400e; }
+  .banner.off  { background: #f0f0f0; color: #777; }
+
+  /* 残り内訳 */
+  .breakdown { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 12px; }
+  .bd-item { background: #f7f8fb; border-radius: 8px; padding: 9px 12px; }
+  .bd-label { font-size: 0.7rem; color: #999; margin-bottom: 3px; }
+  .bd-val   { font-size: 1rem; font-weight: 700; color: #333; }
+
+  /* 補填試算 */
+  .hosoku-box {
+    margin-top: 12px;
+    border-radius: 12px;
+    padding: 16px;
+    border: 2px solid #fca5a5;
+    background: #fff5f5;
+  }
+  .hosoku-box.none {
+    border-color: #86efac;
+    background: #f0fdf4;
+  }
+  .hosoku-title {
+    font-size: 0.72rem; font-weight: 700; color: #b91c1c;
+    text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 10px;
+  }
+  .hosoku-box.none .hosoku-title { color: #15803d; }
+  .hosoku-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; margin-bottom: 10px; }
+  .hosoku-item { text-align: center; }
+  .hosoku-item .h-label { font-size: 0.68rem; color: #888; margin-bottom: 3px; }
+  .hosoku-item .h-val   { font-size: 1rem; font-weight: 800; color: #1a1a2e; }
+  .hosoku-total {
+    text-align: center; background: #fecaca; border-radius: 8px; padding: 10px;
+  }
+  .hosoku-box.none .hosoku-total { background: #bbf7d0; }
+  .hosoku-total .ht-label { font-size: 0.72rem; color: #b91c1c; font-weight: 700; margin-bottom: 4px; }
+  .hosoku-box.none .hosoku-total .ht-label { color: #15803d; }
+  .hosoku-total .ht-val  { font-size: 1.8rem; font-weight: 900; color: #b91c1c; }
+  .hosoku-box.none .hosoku-total .ht-val { color: #15803d; }
+</style>
+</head>
+<body>
+
+<h1>📊 CPA シミュレーター</h1>
+
+<div class="tabs">
+  <button class="tab-btn" onclick="switchBrand('brillio')">チェルラーブリリオ</button>
+  <button class="tab-btn" onclick="switchBrand('white')">チェルラーホワイト</button>
+</div>
+
+<div class="layout">
+
+  <!-- 左: 入力 -->
+  <div>
+    <div class="card">
+      <div class="card-title">📥 現状・目標</div>
+      <div class="field">
+        <label>消化金額（円）</label>
+        <input type="number" id="spend" value="500000" min="0" step="1000" oninput="save();calc()">
+      </div>
+      <div class="field">
+        <label>現状 CPA（円）</label>
+        <input type="number" id="cpaCurrent" value="15000" min="0" step="100" oninput="save();calc()">
+      </div>
+      <div class="field">
+        <label>目標 CPA（期間全体・円）</label>
+        <input type="number" id="cpaTarget" value="12000" min="0" step="100" oninput="save();calc()">
+      </div>
+      <div class="field">
+        <label>残り日数（日）</label>
+        <input type="number" id="remainDays" value="14" min="1" step="1" oninput="save();calc()">
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">🎛️ 残り期間の想定パフォーマンス</div>
+
+      <div class="slider-row">
+        <div class="slider-head">
+          <span class="slider-name">CPC（クリック単価）</span>
+          <span class="slider-badge" id="cpcBadge">¥120</span>
+        </div>
+        <input type="range" id="cpc" min="1" max="2000" step="1" value="120" oninput="syncSlider('cpc');save();calc()">
+        <div class="slider-sub"><span>¥1</span><span>¥2,000</span></div>
+        <input type="number" class="slider-num" id="cpcNum" value="120" min="1" max="2000" step="1" oninput="syncNum('cpc');save();calc()">
+      </div>
+
+      <div class="slider-row">
+        <div class="slider-head">
+          <span class="slider-name">CVR（コンバージョン率）</span>
+          <span class="slider-badge" id="cvrBadge">1.00%</span>
+        </div>
+        <input type="range" id="cvr" min="0.01" max="10" step="0.01" value="1.00" oninput="syncSlider('cvr');save();calc()">
+        <div class="slider-sub"><span>0.01%</span><span>10%</span></div>
+        <input type="number" class="slider-num" id="cvrNum" value="1.00" min="0.01" max="10" step="0.01" oninput="syncNum('cvr');save();calc()">
+      </div>
+
+      <div class="cpa-derived">
+        <span>CPC ÷ CVR = 想定残りCPA</span>
+        <strong id="projRemainCpa">—</strong>
+      </div>
+    </div>
+  </div>
+
+  <!-- 右: ダッシュボード -->
+  <div>
+    <div class="card">
+      <div class="card-title">💰 日予算を設定</div>
+      <div class="budget-input-row">
+        <label>日予算（円）</label>
+        <input type="number" id="dailyBudget" value="30000" min="0" step="1000" oninput="save();calc()">
+      </div>
+
+      <!-- 最終予測サマリー -->
+      <div class="summary-grid">
+        <div class="summary-box total-spend">
+          <div class="s-label">最終消化予想</div>
+          <div class="s-val" id="finalSpend">—</div>
+          <div class="s-sub" id="finalSpendSub">—</div>
+        </div>
+        <div class="summary-box final-cpa">
+          <div class="s-label">最終着地 CPA</div>
+          <div class="s-val" id="finalCpa">—</div>
+          <div class="s-sub" id="finalCpaSub">—</div>
+        </div>
+      </div>
+
+      <!-- CPA 3列比較 -->
+      <div class="cpa-compare">
+        <div class="cpa-col">
+          <div class="cc-label">現状 CPA</div>
+          <div class="cc-val" id="cmpCurrent">—</div>
+          <div class="cc-sub">消化済みの水準</div>
+        </div>
+        <div class="cpa-col accent">
+          <div class="cc-label">目標達成に<br>必要な残りCPA</div>
+          <div class="cc-val" id="cmpRequired">—</div>
+          <div class="cc-sub">日予算次第で変動</div>
+        </div>
+        <div class="cpa-col">
+          <div class="cc-label">想定残りCPA<br>（CPC/CVRから）</div>
+          <div class="cc-val" id="cmpProjected">—</div>
+          <div class="cc-sub">スライダーで調整</div>
+        </div>
+      </div>
+
+      <!-- 残り内訳 -->
+      <div class="breakdown">
+        <div class="bd-item">
+          <div class="bd-label">現状 CV 数</div>
+          <div class="bd-val" id="bdCvNow">—</div>
+        </div>
+        <div class="bd-item">
+          <div class="bd-label">残り消化</div>
+          <div class="bd-val" id="bdRemSpend">—</div>
+        </div>
+        <div class="bd-item">
+          <div class="bd-label">残り CV（想定）</div>
+          <div class="bd-val" id="bdRemCv">—</div>
+        </div>
+        <div class="bd-item">
+          <div class="bd-label">最終 CV 合計</div>
+          <div class="bd-val" id="bdTotalCv">—</div>
+        </div>
+      </div>
+
+      <div class="banner off" id="mainBanner">数値を入力してください</div>
+
+      <!-- 補填試算 -->
+      <div class="hosoku-box none" id="hosokuBox">
+        <div class="hosoku-title" id="hosokuTitle">⚠️ 補填試算</div>
+        <div class="hosoku-grid">
+          <div class="hosoku-item">
+            <div class="h-label">超過CPA（1件あたり）</div>
+            <div class="h-val" id="hosokuPerCv">—</div>
+          </div>
+          <div class="hosoku-item">
+            <div class="h-label">獲得予想件数</div>
+            <div class="h-val" id="hosokuCvCount">—</div>
+          </div>
+          <div class="hosoku-item">
+            <div class="h-label">目標CPA</div>
+            <div class="h-val" id="hosokuTarget">—</div>
+          </div>
+        </div>
+        <div class="hosoku-total">
+          <div class="ht-label" id="hosokuTotalLabel">補填金額（概算）</div>
+          <div class="ht-val" id="hosokuTotal">—</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+const SAVE_IDS = ['spend','cpaCurrent','cpaTarget','remainDays','cpc','cvr','dailyBudget'];
+
+// ブランドごとのデフォルト値
+const DEFAULTS = {
+  white:   { spend:500000, cpaCurrent:15000, cpaTarget:12000, remainDays:14, cpc:120, cvr:1.00, dailyBudget:30000 },
+  brillio: { spend:500000, cpaCurrent:15000, cpaTarget:12000, remainDays:14, cpc:120, cvr:1.00, dailyBudget:30000 },
+};
+
+let currentBrand = localStorage.getItem('cpa_brand') || 'white';
+
+function save() {
+  SAVE_IDS.forEach(id => {
+    const el = document.getElementById(id);
+    if (el) localStorage.setItem(currentBrand + '_cpa_' + id, el.value);
+  });
+}
+function load() {
+  const def = DEFAULTS[currentBrand];
+  SAVE_IDS.forEach(id => {
+    const v = localStorage.getItem(currentBrand + '_cpa_' + id);
+    const val = v !== null ? v : def[id];
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.value = val;
+    const numEl = document.getElementById(id + 'Num');
+    if (numEl) numEl.value = val;
+  });
+}
+
+function switchBrand(brand) {
+  save(); // 現在のブランドの値を保存
+  currentBrand = brand;
+  localStorage.setItem('cpa_brand', brand);
+  // タブの見た目を切り替え
+  document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+  event.currentTarget.classList.add('active');
+  // 値を読み込んで再計算
+  load();
+  badge('cpc', document.getElementById('cpc').value);
+  badge('cvr', document.getElementById('cvr').value);
+  calc();
+}
+
+function syncSlider(id) {
+  const s = document.getElementById(id), n = document.getElementById(id + 'Num');
+  n.value = s.value; badge(id, s.value);
+}
+function syncNum(id) {
+  const s = document.getElementById(id), n = document.getElementById(id + 'Num');
+  s.value = n.value; badge(id, n.value);
+}
+function badge(id, val) {
+  if (id === 'cpc') document.getElementById('cpcBadge').textContent = '¥' + Number(val).toLocaleString('ja-JP');
+  if (id === 'cvr') document.getElementById('cvrBadge').textContent = parseFloat(val).toFixed(2) + '%';
+}
+
+function yen(n) {
+  if (!isFinite(n) || isNaN(n) || n <= 0) return '—';
+  return '¥' + Math.round(n).toLocaleString('ja-JP');
+}
+function num(n, d) {
+  if (!isFinite(n) || isNaN(n)) return '—';
+  return (Math.round(n * 10 ** d) / 10 ** d).toLocaleString('ja-JP');
+}
+
+function calc() {
+  const spend       = parseFloat(document.getElementById('spend').value)       || 0;
+  const cpaCurrent  = parseFloat(document.getElementById('cpaCurrent').value)  || 0;
+  const cpaTarget   = parseFloat(document.getElementById('cpaTarget').value)   || 0;
+  const remainDays  = parseFloat(document.getElementById('remainDays').value)  || 0;
+  const cpc         = parseFloat(document.getElementById('cpc').value)         || 0;
+  const cvrPct      = parseFloat(document.getElementById('cvr').value)         || 0;
+  const dailyBudget = parseFloat(document.getElementById('dailyBudget').value) || 0;
+
+  const cvr        = cvrPct / 100;
+  const cvNow      = cpaCurrent > 0 ? spend / cpaCurrent : 0;
+  const cpaRemProj = cvr > 0 ? cpc / cvr : 0; // 想定残りCPA（CPC/CVRから）
+
+  document.getElementById('projRemainCpa').textContent = yen(cpaRemProj);
+
+  // 現状CPA列
+  const cmpCurEl = document.getElementById('cmpCurrent');
+  cmpCurEl.textContent = yen(cpaCurrent);
+  cmpCurEl.className = 'cc-val' + (cpaCurrent > 0 && cpaTarget > 0
+    ? (cpaCurrent <= cpaTarget ? ' good' : ' bad') : '');
+
+  // 想定残りCPA列
+  const cmpProjEl = document.getElementById('cmpProjected');
+  cmpProjEl.textContent = yen(cpaRemProj);
+
+  // 内訳
+  document.getElementById('bdCvNow').textContent = cvNow > 0 ? num(cvNow, 1) + ' 件' : '—';
+
+  if (dailyBudget <= 0 || remainDays <= 0 || spend <= 0 || cpaCurrent <= 0 || cpaTarget <= 0) {
+    ['finalSpend','finalCpa','cmpRequired','bdRemSpend','bdRemCv','bdTotalCv',
+     'hosokuPerCv','hosokuCvCount','hosokuTarget','hosokuTotal'].forEach(id => {
+      document.getElementById(id).textContent = '—';
+    });
+    document.getElementById('finalSpendSub').textContent = '';
+    document.getElementById('finalCpaSub').textContent = '';
+    document.getElementById('cmpRequired').className = 'cc-val';
+    cmpProjEl.className = 'cc-val';
+    document.getElementById('mainBanner').textContent = '数値を入力してください';
+    document.getElementById('mainBanner').className = 'banner off';
+    document.getElementById('hosokuBox').className = 'hosoku-box none';
+    document.getElementById('hosokuTitle').textContent = '⚠️ 補填試算';
+    return;
+  }
+
+  const remSpend  = dailyBudget * remainDays;
+  const totalSp   = spend + remSpend;
+  const remCvProj = cpaRemProj > 0 ? remSpend / cpaRemProj : 0;
+  const totalCv   = cvNow + remCvProj;
+  const finalCpa  = totalCv > 0 ? totalSp / totalCv : 0;
+
+  // 最終消化・着地CPA
+  document.getElementById('finalSpend').textContent = yen(totalSp);
+  document.getElementById('finalSpendSub').textContent =
+    `消化済 ${yen(spend)} ＋ 残り ${yen(remSpend)}`;
+
+  const fcEl = document.getElementById('finalCpa');
+  fcEl.textContent = yen(finalCpa);
+  fcEl.className = 's-val' + (finalCpa > 0 && finalCpa <= cpaTarget ? ' good' : finalCpa > cpaTarget ? ' bad' : '');
+  document.getElementById('finalCpaSub').textContent = `目標 ${yen(cpaTarget)}`;
+
+  // 必要残りCPA: cpaTarget × remSpend / (totalSp - cpaTarget × cvNow)
+  // → 残り期間でこのCPAを実現すれば全体が目標CPAに収まる
+  const reqDenom  = totalSp - cpaTarget * cvNow;
+  const reqRemCpa = reqDenom > 0 ? (cpaTarget * remSpend) / reqDenom : null;
+
+  const cmpReqEl = document.getElementById('cmpRequired');
+  if (reqRemCpa && reqRemCpa > 0) {
+    cmpReqEl.textContent = yen(reqRemCpa);
+    // 想定残りCPA vs 必要残りCPA
+    cmpProjEl.className = 'cc-val' + (cpaRemProj > 0 && cpaRemProj <= reqRemCpa ? ' good' : ' bad');
+    cmpReqEl.className  = 'cc-val';
+  } else {
+    cmpReqEl.textContent = '達成困難';
+    cmpReqEl.className   = 'cc-val bad';
+    cmpProjEl.className  = 'cc-val warn';
+  }
+
+  // 内訳
+  document.getElementById('bdRemSpend').textContent = yen(remSpend);
+  document.getElementById('bdRemCv').textContent    = cpaRemProj > 0 ? num(remCvProj, 1) + ' 件' : '—';
+  document.getElementById('bdTotalCv').textContent  = num(totalCv, 1) + ' 件';
+
+  // バナー
+  const banner = document.getElementById('mainBanner');
+  const diff = finalCpa - cpaTarget;
+  const pct  = cpaTarget > 0 ? (diff / cpaTarget * 100) : 0;
+  if (finalCpa <= cpaTarget) {
+    banner.textContent = `✅ 目標CPA達成の見込み（${yen(finalCpa)}、目標比 ${pct.toFixed(1)}%）`;
+    banner.className = 'banner ok';
+  } else if (pct <= 10) {
+    banner.textContent = `⚠️ 目標CPAをやや超過（${yen(finalCpa)}、目標比 +${pct.toFixed(1)}%）— 日予算を下げるか CVR 改善を`;
+    banner.className = 'banner warn';
+  } else {
+    banner.textContent = `❌ 目標CPA超過（${yen(finalCpa)}、目標比 +${pct.toFixed(1)}%）— 日予算・CPC・CVRの見直しが必要です`;
+    banner.className = 'banner ng';
+  }
+
+  // 補填試算
+  const hosokuBox   = document.getElementById('hosokuBox');
+  const overCpa     = Math.max(0, finalCpa - cpaTarget); // 超過CPA（1件あたり）
+  const hosokuTotal = Math.round(overCpa * totalCv);
+
+  document.getElementById('hosokuTarget').textContent   = yen(cpaTarget);
+  document.getElementById('hosokuCvCount').textContent  = num(totalCv, 1) + ' 件';
+  document.getElementById('hosokuPerCv').textContent    = overCpa > 0 ? yen(overCpa) : '¥0';
+  document.getElementById('hosokuTotal').textContent    = overCpa > 0 ? yen(hosokuTotal) : '¥0';
+
+  if (overCpa <= 0) {
+    hosokuBox.className = 'hosoku-box none';
+    document.getElementById('hosokuTitle').textContent      = '✅ 補填なし';
+    document.getElementById('hosokuTotalLabel').textContent = '補填金額';
+  } else {
+    hosokuBox.className = 'hosoku-box';
+    document.getElementById('hosokuTitle').textContent      = '⚠️ 補填試算（超過CPA × 獲得予想件数）';
+    document.getElementById('hosokuTotalLabel').textContent = '補填金額（概算）';
+  }
+}
+
+// 初期化
+document.querySelectorAll('.tab-btn').forEach(btn => {
+  const isActive =
+    (btn.textContent.includes('ブリリオ') && currentBrand === 'brillio') ||
+    (btn.textContent.includes('ホワイト') && currentBrand === 'white');
+  btn.classList.toggle('active', isActive);
+});
+load();
+badge('cpc', document.getElementById('cpc').value);
+badge('cvr', document.getElementById('cvr').value);
+calc();
+</script>
+</body>
+</html>

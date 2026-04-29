@@ -1,8 +1,9 @@
 /**
  * ===============================================
  * Outbrain 数値集計スクリプト
- * スプレッドシート：チェルラーホワイト
- * シート：数値集計②
+ * スプレッドシート：りらいぶ配信戦略
+ * シート：数値集計
+ * アカウント：JP_Relive_wear(miraikirei)
  * ===============================================
  *
  * 【初期設定】
@@ -11,23 +12,28 @@
  *   OB_PASSWORD      : Outbrainのパスワード
  *   ※ OB_MARKETER_ID は不要（コードに直接埋め込み済み）
  *
- * 【コンバージョン名（固定設定済み・変更不要）】
- *   ⑦LP遷移数        → "01LP Conversions (Click)"
- *   ⑩確認画面遷移数  → "02 confirm 1day Conversions (Click)"
- *   ⑫CV数            → "thanks 1day Conversions (Click)"
+ * 【コンバージョン名】
+ *   ⑦LP遷移数        → TODO: 管理画面表示名を確認して定数を更新
+ *   ⑩確認画面遷移数  → TODO: 管理画面表示名を確認して定数を更新
+ *   ⑫CV数            → TODO: 管理画面表示名を確認して定数を更新
+ *
+ * 【コンバージョン名の確認方法】
+ *   メニュー「📋 コンバージョン名を確認」を実行 → ログに一覧が出る
+ *   → LP_CONV_DEFAULT_RELIVE 等の定数を実際の名前に書き換える
  */
 
 // ================================================
-// コンバージョン名定数（Outbrain管理画面の表示名と一致させること）
+// コンバージョン名定数
+// TODO: 初回実行後「📋 コンバージョン名を確認」で実際のAPI名を取得して書き換えること
 // ================================================
-var LP_CONV_DEFAULT_WHITE      = '01LP';             // API実測値（管理画面: "01LP Conversions (Click)"）
-var CONFIRM_CONV_DEFAULT_WHITE = '02 confirm 1day'; // API実測値（管理画面: "02 confirm 1day Conversions (Click)"）
-var CV_CONV_DEFAULT_WHITE      = 'thanks 1day';     // API実測値（管理画面: "thanks 1day Conversions (Click)"）
+var LP_CONV_DEFAULT_RELIVE      = 'TODO_LP_CONV';      // 例: '1Day LP Conversions'
+var CONFIRM_CONV_DEFAULT_RELIVE = 'TODO_CONFIRM_CONV'; // 例: 'confirm Conversions'
+var CV_CONV_DEFAULT_RELIVE      = 'TODO_CV_CONV';      // 例: 'thanks Conversions'
 
-var SHEET_NAME_WHITE  = '数値集計②';
-var MARKETER_ID_WHITE = '0033e4d3d312b31c84630c2166acec7b27'; // ホワイト固定（Script Propertiesに依存しない）
+var SHEET_NAME_RELIVE  = '数値集計';
+var MARKETER_ID_RELIVE = '00797d88f6ed45a3f31b85ed0d47644568'; // JP_Relive_wear(miraikirei)固定
 
-// 以下は brillio_outbrain_report.gs と同じ値。単体プロジェクトでも動作するよう再定義
+// 以下は他GASと同じ値。単体プロジェクトでも動作するよう再定義
 // （同一プロジェクト内では var の重複宣言は無害）
 var BASE_URL           = 'https://api.outbrain.com/amplify/v0.1';
 var TOKEN_CACHE_KEY    = 'OB_TOKEN_CACHE';
@@ -37,7 +43,7 @@ var TOKEN_TTL_MS       = 4 * 60 * 60 * 1000; // 4時間有効
 // ================================================
 // 配信金額変換（API値 → 管理画面表示値）
 // ================================================
-function convertSpendWhite(spend) {
+function convertSpendRelive(spend) {
   return Math.round(spend / 0.8 * 1.1);
 }
 
@@ -46,52 +52,64 @@ function convertSpendWhite(spend) {
 // ================================================
 function onOpen() {
   var ui = SpreadsheetApp.getUi();
-  ui.createMenu('🔧 ホワイトOBレポート')
-    .addItem('▶ レポート取得実行', 'runOutbrainReportWhite')
+  ui.createMenu('🔧 リライブシャツコアOBレポート')
+    .addItem('▶ レポート取得実行', 'runOutbrainReportRelive')
     .addSeparator()
-    .addItem('🔍 APIデバッグ実行', 'debugApiBreakdownsWhite')
-    .addItem('📋 コンバージョン名を確認', 'listConversionEventsWhite')
-    .addItem('⚙ 設定ガイド', 'showSetupGuideWhite')
+    .addItem('🔍 APIデバッグ実行', 'debugApiBreakdownsRelive')
+    .addItem('📋 コンバージョン名を確認', 'listConversionEventsRelive')
+    .addItem('⚙ 設定ガイド', 'showSetupGuideRelive')
     .addToUi();
+}
+
+// ================================================
+// トリガーインストール（初回1回のみ・スクリプトエディタから実行）
+// メニューが表示されない場合：エディタで「installTriggerRelive」を選択→実行
+// ================================================
+function installTriggerRelive() {
+  ScriptApp.getProjectTriggers().forEach(function(t) {
+    if (t.getHandlerFunction() === 'onOpen') ScriptApp.deleteTrigger(t);
+  });
+  var ss = SpreadsheetApp.openById('1x2ckeFixm8nF7atrURQbXBF-r-iPfCVA1LBmy93LnDA');
+  ScriptApp.newTrigger('onOpen').forSpreadsheet(ss).onOpen().create();
+  Logger.log('onOpenトリガー設定完了。スプレッドシートを開き直すとメニューが表示されます。');
 }
 
 // ================================================
 // API実行用エントリポイント（UI不使用・外部から呼び出し可能）
 // ================================================
-function runOutbrainReportApiWhite(startDate, endDate) {
+function runOutbrainReportApiRelive(startDate, endDate) {
   var ss    = SpreadsheetApp.getActiveSpreadsheet();
-  var sheet = ss.getSheetByName(SHEET_NAME_WHITE);
+  var sheet = ss.getSheetByName(SHEET_NAME_RELIVE);
 
   if (!startDate || !endDate) {
-    // 引数なしの場合はシートから読み取る
     var startVal = sheet.getRange('C2').getValue();
     var endVal   = sheet.getRange('C3').getValue();
-    startDate = formatDateForAPIWhite(startVal);
-    endDate   = formatDateForAPIWhite(endVal);
+    startDate = formatDateForAPIRelive(startVal);
+    endDate   = formatDateForAPIRelive(endVal);
   }
 
-  if (!sheet)    { return { success: false, error: '数値集計②シートが見つかりません' }; }
+  if (!sheet)    { return { success: false, error: '数値集計シートが見つかりません' }; }
   if (!startDate || !endDate) { return { success: false, error: 'C2/C3に日付が設定されていません' }; }
 
   var props       = PropertiesService.getScriptProperties();
   var username    = props.getProperty('OB_USERNAME');
   var password    = props.getProperty('OB_PASSWORD');
-  var marketerId  = MARKETER_ID_WHITE;
-  var lpConv      = props.getProperty('LP_CONV_NAME')      || LP_CONV_DEFAULT_WHITE;
-  var confirmConv = props.getProperty('CONFIRM_CONV_NAME') || CONFIRM_CONV_DEFAULT_WHITE;
-  var cvConv      = props.getProperty('CV_CONV_NAME')      || CV_CONV_DEFAULT_WHITE;
+  var marketerId  = MARKETER_ID_RELIVE;
+  var lpConv      = props.getProperty('LP_CONV_NAME')      || LP_CONV_DEFAULT_RELIVE;
+  var confirmConv = props.getProperty('CONFIRM_CONV_NAME') || CONFIRM_CONV_DEFAULT_RELIVE;
+  var cvConv      = props.getProperty('CV_CONV_NAME')      || CV_CONV_DEFAULT_RELIVE;
 
   if (!username || !password) { return { success: false, error: 'OB_USERNAME/OB_PASSWORD が未設定です' }; }
 
-  var token = getOutbrainTokenWhite(username, password);
+  var token = getOutbrainTokenRelive(username, password);
   if (!token) { return { success: false, error: 'Outbrain認証失敗' }; }
 
-  var campaignMap      = buildCampaignMapWhite(token, marketerId);
-  var cpnData          = getCampaignReportWhite(token, marketerId, startDate, endDate, lpConv, confirmConv, cvConv, campaignMap);
+  var campaignMap      = buildCampaignMapRelive(token, marketerId);
+  var cpnData          = getCampaignReportRelive(token, marketerId, startDate, endDate, lpConv, confirmConv, cvConv, campaignMap);
   var activeCampaignIds = cpnData.map(function(d) { return d.campaignId; });
-  var crData           = getCreativeReportWhite(token, marketerId, activeCampaignIds, startDate, endDate, lpConv, cvConv, campaignMap);
+  var crData           = getCreativeReportRelive(token, marketerId, activeCampaignIds, startDate, endDate, lpConv, cvConv, campaignMap);
 
-  writeToSheetWhite(sheet, cpnData, crData, startDate, endDate);
+  writeToSheetRelive(sheet, cpnData, crData, startDate, endDate);
   SpreadsheetApp.flush();
 
   return {
@@ -106,17 +124,16 @@ function runOutbrainReportApiWhite(startDate, endDate) {
 // ================================================
 // メイン実行（カスタムメニューから呼び出し）
 // ================================================
-function runOutbrainReportWhite() {
+function runOutbrainReportRelive() {
   var ui = SpreadsheetApp.getUi();
   var ss = SpreadsheetApp.getActiveSpreadsheet();
-  var sheet = ss.getSheetByName(SHEET_NAME_WHITE);
+  var sheet = ss.getSheetByName(SHEET_NAME_RELIVE);
 
   if (!sheet) {
-    ui.alert('「数値集計②」シートが見つかりません。'); // ★変更
+    ui.alert('「数値集計」シートが見つかりません。');
     return;
   }
 
-  // 日付取得（C2: 開始日, C3: 終了日）
   var startVal = sheet.getRange('C2').getValue();
   var endVal   = sheet.getRange('C3').getValue();
 
@@ -125,22 +142,21 @@ function runOutbrainReportWhite() {
     return;
   }
 
-  var startDate = formatDateForAPIWhite(startVal);
-  var endDate   = formatDateForAPIWhite(endVal);
+  var startDate = formatDateForAPIRelive(startVal);
+  var endDate   = formatDateForAPIRelive(endVal);
 
   if (!startDate || !endDate) {
     ui.alert('日付の形式が正しくありません。\n例: 2026/04/01');
     return;
   }
 
-  // 認証情報
   var props      = PropertiesService.getScriptProperties();
   var username   = props.getProperty('OB_USERNAME');
   var password   = props.getProperty('OB_PASSWORD');
-  var marketerId = MARKETER_ID_WHITE;
-  var lpConv     = props.getProperty('LP_CONV_NAME')      || LP_CONV_DEFAULT_WHITE;
-  var confirmConv= props.getProperty('CONFIRM_CONV_NAME') || CONFIRM_CONV_DEFAULT_WHITE;
-  var cvConv     = props.getProperty('CV_CONV_NAME')      || CV_CONV_DEFAULT_WHITE;
+  var marketerId = MARKETER_ID_RELIVE;
+  var lpConv     = props.getProperty('LP_CONV_NAME')      || LP_CONV_DEFAULT_RELIVE;
+  var confirmConv= props.getProperty('CONFIRM_CONV_NAME') || CONFIRM_CONV_DEFAULT_RELIVE;
+  var cvConv     = props.getProperty('CV_CONV_NAME')      || CV_CONV_DEFAULT_RELIVE;
 
   if (!username || !password) {
     ui.alert(
@@ -152,32 +168,26 @@ function runOutbrainReportWhite() {
     return;
   }
 
-  // トークン取得
   Logger.log('認証開始: ' + startDate + ' 〜 ' + endDate);
-  var token = getOutbrainTokenWhite(username, password);
+  var token = getOutbrainTokenRelive(username, password);
   if (!token) {
     ui.alert('Outbrain認証失敗。\nメールアドレス・パスワードを確認してください。\n詳細はログ（Apps Script > ログ）を確認。');
     return;
   }
   Logger.log('認証成功');
 
-  // キャンペーン一覧（名前マップ用）
-  var campaignMap = buildCampaignMapWhite(token, marketerId);
+  var campaignMap = buildCampaignMapRelive(token, marketerId);
   Logger.log('キャンペーン数: ' + Object.keys(campaignMap).length);
 
-  // キャンペーン別レポート（includeConversionDetails方式）
-  var cpnData = getCampaignReportWhite(token, marketerId, startDate, endDate, lpConv, confirmConv, cvConv, campaignMap);
+  var cpnData = getCampaignReportRelive(token, marketerId, startDate, endDate, lpConv, confirmConv, cvConv, campaignMap);
   Logger.log('有効CPN数: ' + cpnData.length);
 
-  // CPN IDリスト（spend >= 1円）
   var activeCampaignIds = cpnData.map(function(d) { return d.campaignId; });
 
-  // CR別レポート（各キャンペーンのCR）
-  var crData = getCreativeReportWhite(token, marketerId, activeCampaignIds, startDate, endDate, lpConv, cvConv, campaignMap);
+  var crData = getCreativeReportRelive(token, marketerId, activeCampaignIds, startDate, endDate, lpConv, cvConv, campaignMap);
   Logger.log('有効CR数: ' + crData.length);
 
-  // シートへ書き込み
-  writeToSheetWhite(sheet, cpnData, crData, startDate, endDate);
+  writeToSheetRelive(sheet, cpnData, crData, startDate, endDate);
   SpreadsheetApp.flush();
 
   ui.alert(
@@ -191,7 +201,7 @@ function runOutbrainReportWhite() {
 // ================================================
 // 日付フォーマット
 // ================================================
-function formatDateForAPIWhite(val) {
+function formatDateForAPIRelive(val) {
   if (!val) return null;
   var d = (val instanceof Date) ? val : new Date(val);
   if (isNaN(d.getTime())) return null;
@@ -201,7 +211,7 @@ function formatDateForAPIWhite(val) {
   return y + '-' + m + '-' + dy;
 }
 
-function formatDateJPWhite(val) {
+function formatDateJPRelive(val) {
   if (!val) return '';
   var d = (val instanceof Date) ? val : new Date(val);
   if (isNaN(d.getTime())) return '';
@@ -211,8 +221,7 @@ function formatDateJPWhite(val) {
 // ================================================
 // Outbrain 認証（Basic Auth + トークンキャッシュ）
 // ================================================
-function getOutbrainTokenWhite(username, password) {
-  // キャッシュ確認
+function getOutbrainTokenRelive(username, password) {
   var props      = PropertiesService.getScriptProperties();
   var cachedToken = props.getProperty(TOKEN_CACHE_KEY);
   var cachedTs    = parseInt(props.getProperty(TOKEN_CACHE_TS_KEY) || '0', 10);
@@ -233,7 +242,6 @@ function getOutbrainTokenWhite(username, password) {
 
     if (response.getResponseCode() === 429) {
       Logger.log('レート制限(429)。キャッシュトークンで再試行します。');
-      // 期限切れでもキャッシュトークンをフォールバックとして使用
       if (cachedToken) {
         Logger.log('期限切れキャッシュトークンをフォールバック使用');
         return cachedToken;
@@ -243,18 +251,15 @@ function getOutbrainTokenWhite(username, password) {
     }
 
     if (response.getResponseCode() === 200) {
-      // トークンはレスポンスヘッダーに含まれる
       var headers = response.getHeaders();
       var token   = headers['OB-TOKEN-V1'] || headers['ob-token-v1'];
       if (!token) {
-        // JSONにある場合を試みる
         try {
           var json = JSON.parse(response.getContentText());
           token = json.OB_TOKEN_V1 || json['OB-TOKEN-V1'];
         } catch(e) {}
       }
       if (token) {
-        // キャッシュに保存
         props.setProperty(TOKEN_CACHE_KEY, token);
         props.setProperty(TOKEN_CACHE_TS_KEY, String(Date.now()));
         return token;
@@ -273,7 +278,7 @@ function getOutbrainTokenWhite(username, password) {
 // ================================================
 // キャンペーン名マップ作成（ページネーション対応）
 // ================================================
-function buildCampaignMapWhite(token, marketerId) {
+function buildCampaignMapRelive(token, marketerId) {
   var map = {};
   var offset = 0;
   var limit  = 50;
@@ -291,7 +296,7 @@ function buildCampaignMapWhite(token, marketerId) {
       var campaigns = data.campaigns || [];
       campaigns.forEach(function(c) { map[c.id] = c.name || c.id; });
       Logger.log('buildCampaignMap: offset=' + offset + ' 件数=' + campaigns.length + ' 累計=' + Object.keys(map).length);
-      if (campaigns.length < limit) break; // 最終ページ
+      if (campaigns.length < limit) break;
       offset += limit;
       Utilities.sleep(300);
     }
@@ -302,50 +307,9 @@ function buildCampaignMapWhite(token, marketerId) {
 }
 
 // ================================================
-// コンバージョンゴールID取得（複数URLを試みる）
-// ================================================
-function getConversionGoalIdsWhite(token, marketerId, lpConv, confirmConv, cvConv) {
-  var ids = { lpId: null, confirmId: null, cvId: null };
-  var tryUrls = [
-    BASE_URL + '/marketers/' + marketerId + '/conversionGoals?limit=50',
-    BASE_URL + '/marketers/' + marketerId + '/conversionGoals',
-    BASE_URL + '/reports/marketers/' + marketerId + '/conversionGoals?limit=50'
-  ];
-  for (var t = 0; t < tryUrls.length; t++) {
-    try {
-      var resp = UrlFetchApp.fetch(tryUrls[t], {
-        headers: { 'OB-TOKEN-V1': token },
-        muteHttpExceptions: true
-      });
-      Logger.log('ConversionGoals[' + t + '] status: ' + resp.getResponseCode() + ' url: ' + tryUrls[t]);
-      var body = resp.getContentText();
-      Logger.log('ConversionGoals[' + t + '] response: ' + body.substring(0, 400));
-      if (resp.getResponseCode() !== 200) continue;
-
-      var data = JSON.parse(body);
-      var list = data.conversionGoals || data.goals || [];
-      list.forEach(function(g) {
-        var id   = g.id || '';
-        var name = (g.name || '').toLowerCase();
-        var lpL  = lpConv.toLowerCase();
-        var cnL  = confirmConv.toLowerCase();
-        var cvL  = cvConv.toLowerCase();
-        if (!ids.lpId      && (name === lpL || name.indexOf(lpL) >= 0 || lpL.indexOf(name) >= 0)) ids.lpId      = id;
-        if (!ids.confirmId && (name === cnL || name.indexOf(cnL) >= 0 || cnL.indexOf(name) >= 0)) ids.confirmId = id;
-        if (!ids.cvId      && (name === cvL || name.indexOf(cvL) >= 0 || cvL.indexOf(name) >= 0)) ids.cvId      = id;
-      });
-      break; // 成功したらループ終了
-    } catch(e) {
-      Logger.log('getConversionGoalIds[' + t + '] 例外: ' + e.toString());
-    }
-  }
-  return ids;
-}
-
-// ================================================
 // キャンペーン別レポート（includeConversionDetails方式）
 // ================================================
-function getCampaignReportWhite(token, marketerId, from, to, lpConv, confirmConv, cvConv, campaignMap) {
+function getCampaignReportRelive(token, marketerId, from, to, lpConv, confirmConv, cvConv, campaignMap) {
   var url    = BASE_URL + '/reports/marketers/' + marketerId + '/campaigns/periodic';
   var params = '?from=' + from + '&to=' + to + '&includeConversionDetails=true';
 
@@ -370,13 +334,12 @@ function getCampaignReportWhite(token, marketerId, from, to, lpConv, confirmConv
         tot.spend       += (m.spend       || 0);
         tot.impressions += (m.impressions || 0);
         tot.clicks      += (m.clicks      || 0);
-        // conversionMetrics から名前付きコンバージョンを取得
         (m.conversionMetrics || []).forEach(function(cm) {
-          var name = (cm.name || '').trim();
+          var name = (cm.name || '').replace(/　/g, ' ').trim();
           var val  = cm.conversions || 0;
-          if (name === lpConv)      tot.lpCount      += val;
-          if (name === confirmConv) tot.confirmCount += val;
-          if (name === cvConv)      tot.cvCount      += val;
+          if (convMatchRelive(name, lpConv))      tot.lpCount      += val;
+          if (convMatchRelive(name, confirmConv)) tot.confirmCount += val;
+          if (convMatchRelive(name, cvConv))      tot.cvCount      += val;
         });
       });
       if (tot.spend >= 1) {
@@ -396,69 +359,16 @@ function getCampaignReportWhite(token, marketerId, from, to, lpConv, confirmConv
     Logger.log('getCampaignReport 例外: ' + e.toString());
   }
 
-  // 配信金額降順でソート
   results.sort(function(a, b) { return b.spend - a.spend; });
   return results;
 }
 
 // ================================================
-// キャンペーン単位のコンバージョン取得（ゴールIDを使用）
-// ================================================
-function getCampaignNamedConversionsWhite(token, marketerId, campaignId, from, to, goalIds) {
-  var result = { lpCount: 0, confirmCount: 0, cvCount: 0 };
-  var base   = BASE_URL + '/reports/marketers/' + marketerId + '/campaigns/' + campaignId +
-               '/periodic?from=' + from + '&to=' + to + '&breakdown=daily';
-
-  var goals = [
-    { id: goalIds.lpId,      key: 'lpCount',      label: 'LP' },
-    { id: goalIds.confirmId, key: 'confirmCount',  label: 'confirm' },
-    { id: goalIds.cvId,      key: 'cvCount',       label: 'CV' }
-  ];
-
-  goals.forEach(function(g) {
-    if (!g.id) {
-      Logger.log('  [' + g.label + '] ゴールIDなし → スキップ');
-      return;
-    }
-    Utilities.sleep(100);
-    try {
-      var url  = base + '&conversionGoalId=' + g.id;
-      var resp = UrlFetchApp.fetch(url, {
-        headers: { 'OB-TOKEN-V1': token },
-        muteHttpExceptions: true
-      });
-      var code = resp.getResponseCode();
-      Logger.log('  [' + g.label + '] goalId=' + g.id + ' status=' + code);
-      if (code !== 200) {
-        Logger.log('  → ' + resp.getContentText().substring(0, 150));
-        return;
-      }
-      var data  = JSON.parse(resp.getContentText());
-      var total = 0;
-      (data.results || []).forEach(function(r) {
-        var m = r.metrics || {};
-        total += (m.conversions || m.totalConversions || 0);
-      });
-      result[g.key] = total;
-      Logger.log('  [' + g.label + '] ' + campaignId + ' = ' + total);
-    } catch(e) {
-      Logger.log('  [' + g.label + '] 例外: ' + e.toString());
-    }
-  });
-
-  Logger.log('Campaign ' + campaignId + ' 最終: LP=' + result.lpCount +
-             ' confirm=' + result.confirmCount + ' cv=' + result.cvCount);
-  return result;
-}
-
-// ================================================
 // CR別レポート（promotedContentエンドポイント使用）
-// 1回のAPIコールで全CR のスペック・画像・LP/CV込みで取得
 // ================================================
-function getCreativeReportWhite(token, marketerId, campaignIds, from, to, lpConv, cvConv, campaignMap) {
+function getCreativeReportRelive(token, marketerId, campaignIds, from, to, lpConv, cvConv, campaignMap) {
   var allCreatives = [];
 
-  // 有効なキャンペーンIDのセット（フィルタ用）
   var campaignIdSet = {};
   campaignIds.forEach(function(id) { campaignIdSet[id] = true; });
 
@@ -476,9 +386,8 @@ function getCreativeReportWhite(token, marketerId, campaignIds, from, to, lpConv
     }
 
     var data = JSON.parse(resp.getContentText());
-    Logger.log('promotedContent totalResults: ' + (data.totalResults || data.results.length));
+    Logger.log('promotedContent totalResults: ' + (data.totalResults || (data.results || []).length));
 
-    // campaignId別にグループ化
     var byCampaign = {};
     (data.results || []).forEach(function(item) {
       var meta   = item.metadata || {};
@@ -488,13 +397,12 @@ function getCreativeReportWhite(token, marketerId, campaignIds, from, to, lpConv
       var m  = item.metrics || {};
       var lp = 0, cv = 0;
       (m.conversionMetrics || []).forEach(function(cm) {
-        var name = (cm.name || '').trim();
+        var name = (cm.name || '').replace(/　/g, ' ').trim();
         var val  = cm.conversions || 0;
-        if (lpConv && name === lpConv) lp += val;
-        if (cvConv && name === cvConv) cv += val;
+        if (lpConv && convMatchRelive(name, lpConv)) lp += val;
+        if (cvConv && convMatchRelive(name, cvConv)) cv += val;
       });
 
-      // 画像URL（originalImageUrl優先）
       var imgMeta  = meta.imageMetadata || {};
       var imageUrl = imgMeta.originalImageUrl || imgMeta.requestedImageUrl || '';
 
@@ -518,7 +426,6 @@ function getCreativeReportWhite(token, marketerId, campaignIds, from, to, lpConv
       }
     });
 
-    // campaignIds の順番通りに、各CPN内は配信費降順でフラットリストに変換
     campaignIds.forEach(function(campId) {
       var crs = byCampaign[campId] || [];
       crs.sort(function(a, b) { return b.spend - a.spend; });
@@ -534,32 +441,20 @@ function getCreativeReportWhite(token, marketerId, campaignIds, from, to, lpConv
 }
 
 // ================================================
-// cbnの部分一致検索（スペース違い等の揺れに対応）
+// コンバージョン名マッチ（全角スペース正規化・前方一致）
 // ================================================
-function cbnLookupWhite(cbn, convName) {
-  if (!convName) return 0;
-  // 完全一致
-  if (cbn[convName] !== undefined) return cbn[convName] || 0;
-  // 部分一致（大文字小文字区別なし）
-  var convLower = convName.toLowerCase();
-  var total = 0;
-  Object.keys(cbn).forEach(function(key) {
-    var keyLower = key.toLowerCase();
-    if (keyLower === convLower ||
-        keyLower.indexOf(convLower) >= 0 ||
-        convLower.indexOf(keyLower) >= 0) {
-      total += (cbn[key] || 0);
-    }
-  });
-  return total;
+function convMatchRelive(apiName, targetName) {
+  if (!apiName || !targetName) return false;
+  var normalize = function(s) { return s.replace(/　/g, ' ').toLowerCase().trim(); };
+  var a = normalize(apiName);
+  var t = normalize(targetName);
+  return a === t || a.indexOf(t) === 0 || t.indexOf(a) === 0;
 }
-
 
 // ================================================
 // シートへの書き込み
 // ================================================
-function writeToSheetWhite(sheet, cpnData, crData, startDate, endDate) {
-  // ---- 既存データクリア（6行目以降）----
+function writeToSheetRelive(sheet, cpnData, crData, startDate, endDate) {
   var lastRow = sheet.getLastRow();
   if (lastRow >= 6) {
     sheet.getRange(6, 1, lastRow - 5, 26).clearContent();
@@ -571,7 +466,6 @@ function writeToSheetWhite(sheet, cpnData, crData, startDate, endDate) {
   // ===================================================
   // ■ CPN別集計
   // ===================================================
-  // セクションタイトル
   var cpnTitleCell = sheet.getRange(currentRow, 2);
   cpnTitleCell.setValue('■ CPN別集計　（' + startDate + ' 〜 ' + endDate + '）');
   cpnTitleCell.setFontWeight('bold').setFontSize(12)
@@ -581,7 +475,6 @@ function writeToSheetWhite(sheet, cpnData, crData, startDate, endDate) {
        .setFontSize(12).setVerticalAlignment('middle');
   currentRow++;
 
-  // ヘッダー行
   var cpnHeaders = [
     'CPN名',
     '①配信金額', '②CPC', '③CPM',
@@ -597,57 +490,44 @@ function writeToSheetWhite(sheet, cpnData, crData, startDate, endDate) {
        .setFontSize(12).setVerticalAlignment('middle');
   currentRow++;
 
-  // データ行
   var cpnStartRow = currentRow;
   if (cpnData.length > 0) {
     var cpnValues = cpnData.map(function(d) {
       return [
-        d.campaignName,           // B: CPN名
-        convertSpendWhite(d.spend),    // C: ①配信金額
-        '',                   // D: ②CPC (計算)
-        '',                   // E: ③CPM (計算)
-        d.impressions,        // F: ④Imp
-        d.clicks,             // G: ⑤Click
-        '',                   // H: ⑥CTR (計算)
-        d.lpCount,            // I: ⑦LP遷移数
-        '',                   // J: ⑧LP遷移率 (計算)
-        '',                   // K: ⑨LPCVR (計算)
-        d.confirmCount,       // L: ⑩確認画面遷移数
-        '',                   // M: ⑪確認画面遷移率 (計算)
-        d.cvCount,            // N: ⑫CV数
-        '',                   // O: ⑬CVR (計算)
-        ''                    // P: ⑭CPA (計算)
+        d.campaignName,
+        convertSpendRelive(d.spend),
+        '', '', // CPC, CPM
+        d.impressions,
+        d.clicks,
+        '',     // CTR
+        d.lpCount,
+        '', '', // LP遷移率, LPCVR
+        d.confirmCount,
+        '',     // 確認画面遷移率
+        d.cvCount,
+        '', ''  // CVR, CPA
       ];
     });
     sheet.getRange(cpnStartRow, 2, cpnValues.length, 15).setValues(cpnValues);
-
-    // フォントサイズ・縦揃え
     sheet.getRange(cpnStartRow, 2, cpnData.length, 15).setFontSize(12).setVerticalAlignment('middle');
-
-    // 数値列を右揃え（C列=3 〜 P列=16 の14列、B列=CPN名は除く）
     sheet.getRange(cpnStartRow, 3, cpnData.length, 14).setHorizontalAlignment('right');
+    sheet.getRange(cpnStartRow, 3, cpnData.length, 1).setNumberFormat('¥#,##0');
+    sheet.getRange(cpnStartRow, 6, cpnData.length, 1).setNumberFormat('#,##0');
+    sheet.getRange(cpnStartRow, 7, cpnData.length, 1).setNumberFormat('#,##0');
+    sheet.getRange(cpnStartRow, 9, cpnData.length, 1).setNumberFormat('#,##0');
+    sheet.getRange(cpnStartRow, 12, cpnData.length, 1).setNumberFormat('#,##0');
+    sheet.getRange(cpnStartRow, 14, cpnData.length, 1).setNumberFormat('#,##0');
 
-    // 数値フォーマット
-    sheet.getRange(cpnStartRow, 3, cpnData.length, 1).setNumberFormat('¥#,##0');   // 配信金額
-    sheet.getRange(cpnStartRow, 6, cpnData.length, 1).setNumberFormat('#,##0');    // Imp
-    sheet.getRange(cpnStartRow, 7, cpnData.length, 1).setNumberFormat('#,##0');    // Click
-    sheet.getRange(cpnStartRow, 9, cpnData.length, 1).setNumberFormat('#,##0');    // LP遷移数
-    sheet.getRange(cpnStartRow, 12, cpnData.length, 1).setNumberFormat('#,##0');   // 確認画面遷移数
-    sheet.getRange(cpnStartRow, 14, cpnData.length, 1).setNumberFormat('#,##0');   // CV数
-
-    // 計算列のフォーミュラ設定
     for (var i = 0; i < cpnData.length; i++) {
-      var row = cpnStartRow + i;
-      setCpnFormulasWhite(sheet, row);
+      setCpnFormulasRelive(sheet, cpnStartRow + i);
     }
-
     currentRow += cpnData.length;
   } else {
     sheet.getRange(currentRow, 2).setValue('(該当期間にデータなし)');
     currentRow++;
   }
 
-  currentRow += 2;  // 空行
+  currentRow += 2;
 
   // ===================================================
   // ■ CR別集計
@@ -661,7 +541,6 @@ function writeToSheetWhite(sheet, cpnData, crData, startDate, endDate) {
        .setFontSize(12).setVerticalAlignment('middle');
   currentRow++;
 
-  // CR ヘッダー行
   var crHeaders = [
     'CPN名', 'CR画像', 'CRタイトル',
     '①配信金額', '②CPC', '③CPM',
@@ -676,67 +555,50 @@ function writeToSheetWhite(sheet, cpnData, crData, startDate, endDate) {
        .setFontSize(12).setVerticalAlignment('middle');
   currentRow++;
 
-  // CR データ行
   var crStartRow = currentRow;
   if (crData.length > 0) {
     var crValues = crData.map(function(d) {
       return [
-        d.campaignName,   // B: CPN名
-        '',               // C: CR画像 (IMAGEフォーミュラ)
-        d.title,          // D: CRタイトル
-        convertSpendWhite(d.spend),    // E: ①配信金額
-        '',               // F: ②CPC (計算)
-        '',               // G: ③CPM (計算)
-        d.impressions,    // H: ④Imp
-        d.clicks,         // I: ⑤Click
-        '',               // J: ⑥CTR (計算)
-        d.lpCount,        // K: ⑦LP遷移数
-        '',               // L: ⑧LP遷移率 (計算)
-        '',               // M: ⑨LPCVR (計算)
-        d.cvCount,        // N: ⑫CV数
-        '',               // O: ⑬CVR (計算)
-        ''                // P: ⑭CPA (計算)
+        d.campaignName,
+        '',
+        d.title,
+        convertSpendRelive(d.spend),
+        '', '',
+        d.impressions,
+        d.clicks,
+        '',
+        d.lpCount,
+        '', '',
+        d.cvCount,
+        '', ''
       ];
     });
     sheet.getRange(crStartRow, 2, crValues.length, crHeaders.length).setValues(crValues);
-
-    // フォントサイズ・縦揃え
     sheet.getRange(crStartRow, 2, crData.length, crHeaders.length).setFontSize(12).setVerticalAlignment('middle');
-
-    // 数値列を右揃え（E列=5 〜 P列=16 の12列、B=CPN名/C=画像/D=タイトルは除く）
     sheet.getRange(crStartRow, 5, crData.length, 12).setHorizontalAlignment('right');
+    sheet.getRange(crStartRow, 5, crData.length, 1).setNumberFormat('¥#,##0');
+    sheet.getRange(crStartRow, 8, crData.length, 1).setNumberFormat('#,##0');
+    sheet.getRange(crStartRow, 9, crData.length, 1).setNumberFormat('#,##0');
+    sheet.getRange(crStartRow, 11, crData.length, 1).setNumberFormat('#,##0');
+    sheet.getRange(crStartRow, 13, crData.length, 1).setNumberFormat('#,##0');
 
-    // 数値フォーマット
-    sheet.getRange(crStartRow, 5, crData.length, 1).setNumberFormat('¥#,##0');   // 配信金額
-    sheet.getRange(crStartRow, 8, crData.length, 1).setNumberFormat('#,##0');    // Imp
-    sheet.getRange(crStartRow, 9, crData.length, 1).setNumberFormat('#,##0');    // Click
-    sheet.getRange(crStartRow, 11, crData.length, 1).setNumberFormat('#,##0');   // LP遷移数
-    sheet.getRange(crStartRow, 14, crData.length, 1).setNumberFormat('#,##0');   // CV数
-
-    // 画像と計算列のフォーミュラ
     for (var j = 0; j < crData.length; j++) {
       var crRow = crStartRow + j;
       var d     = crData[j];
-
-      // 画像セル（C列 = 列3）
       if (d.imageUrl) {
         sheet.getRange(crRow, 3).setFormula('=IMAGE("' + d.imageUrl.replace(/"/g, '') + '",1)');
       } else {
         sheet.getRange(crRow, 3).setValue('(画像なし)');
       }
-
-      setCrFormulasWhite(sheet, crRow);
+      setCrFormulasRelive(sheet, crRow);
     }
 
-    // 行の高さを設定（画像表示用）
     for (var k = crStartRow; k < crStartRow + crData.length; k++) {
       sheet.setRowHeight(k, 80);
     }
-
-    // 列幅設定
-    sheet.setColumnWidth(2, 320);   // B: CPN名
-    sheet.setColumnWidth(3, 120);   // C: 画像
-    sheet.setColumnWidth(4, 280);   // D: タイトル
+    sheet.setColumnWidth(2, 320);
+    sheet.setColumnWidth(3, 120);
+    sheet.setColumnWidth(4, 280);
 
     currentRow += crData.length;
   } else {
@@ -749,11 +611,11 @@ function writeToSheetWhite(sheet, cpnData, crData, startDate, endDate) {
 
 // ================================================
 // CPN別 計算フォーミュラ設定
-// ================================================
 // 列: B=2, C=3(配信金額), D=4(CPC), E=5(CPM), F=6(Imp), G=7(Click),
 //     H=8(CTR), I=9(LP遷移数), J=10(LP遷移率), K=11(LPCVR),
 //     L=12(確認画面), M=13(確認画面率), N=14(CV数), O=15(CVR), P=16(CPA)
-function setCpnFormulasWhite(sheet, row) {
+// ================================================
+function setCpnFormulasRelive(sheet, row) {
   var spend   = 'C' + row;
   var imp     = 'F' + row;
   var click   = 'G' + row;
@@ -761,78 +623,64 @@ function setCpnFormulasWhite(sheet, row) {
   var confirm = 'L' + row;
   var cv      = 'N' + row;
 
-  sheet.getRange(row, 4).setFormula(  // ②CPC
-    '=IFERROR(ROUND(' + spend + '/' + click + ',1),"")');
-  sheet.getRange(row, 5).setFormula(  // ③CPM
-    '=IFERROR(ROUND(' + spend + '/' + imp + '*1000,1),"")');
-  sheet.getRange(row, 8).setFormula(  // ⑥CTR
-    '=IFERROR(TEXT(' + click + '/' + imp + ',"0.00%"),"")');
-  sheet.getRange(row, 10).setFormula( // ⑧LP遷移率
-    '=IFERROR(TEXT(' + lp + '/' + click + ',"0.00%"),"")');
-  sheet.getRange(row, 11).setFormula( // ⑨LPCVR
-    '=IFERROR(TEXT(' + cv + '/' + lp + ',"0.00%"),"")');
-  sheet.getRange(row, 13).setFormula( // ⑪確認画面遷移率
-    '=IFERROR(TEXT(' + confirm + '/' + click + ',"0.00%"),"")');
-  sheet.getRange(row, 15).setFormula( // ⑬CVR
-    '=IFERROR(TEXT(' + cv + '/' + click + ',"0.00%"),"")');
-  sheet.getRange(row, 16).setFormula( // ⑭CPA
-    '=IF(' + cv + '=0,"‐",IFERROR(ROUND(' + spend + '/' + cv + ',0),"‐"))');
+  sheet.getRange(row, 4).setFormula('=IFERROR(ROUND(' + spend + '/' + click + ',1),"")');
+  sheet.getRange(row, 5).setFormula('=IFERROR(ROUND(' + spend + '/' + imp + '*1000,1),"")');
+  sheet.getRange(row, 8).setFormula('=IFERROR(TEXT(' + click + '/' + imp + ',"0.00%"),"")');
+  sheet.getRange(row, 10).setFormula('=IFERROR(TEXT(' + lp + '/' + click + ',"0.00%"),"")');
+  sheet.getRange(row, 11).setFormula('=IFERROR(TEXT(' + cv + '/' + lp + ',"0.00%"),"")');
+  sheet.getRange(row, 13).setFormula('=IFERROR(TEXT(' + confirm + '/' + click + ',"0.00%"),"")');
+  sheet.getRange(row, 15).setFormula('=IFERROR(TEXT(' + cv + '/' + click + ',"0.00%"),"")');
+  sheet.getRange(row, 16).setFormula('=IF(' + cv + '=0,"‐",IFERROR(ROUND(' + spend + '/' + cv + ',0),"‐"))');
 }
 
 // ================================================
 // CR別 計算フォーミュラ設定
-// ================================================
 // 列: B=2(CPN名), C=3(画像), D=4(タイトル),
 //     E=5(配信金額), F=6(CPC), G=7(CPM), H=8(Imp), I=9(Click),
 //     J=10(CTR), K=11(LP遷移数), L=12(LP遷移率), M=13(LPCVR),
-//     N=14(CV数), O=15(CVR), P=16(CPA)
-function setCrFormulasWhite(sheet, row) {
+//     N=13(CV数), O=14(CVR), P=15(CPA)
+// ================================================
+function setCrFormulasRelive(sheet, row) {
   var spend   = 'E' + row;
   var imp     = 'H' + row;
   var click   = 'I' + row;
   var lp      = 'K' + row;
   var cv      = 'N' + row;
 
-  sheet.getRange(row, 6).setFormula(  // ②CPC
-    '=IFERROR(ROUND(' + spend + '/' + click + ',1),"")');
-  sheet.getRange(row, 7).setFormula(  // ③CPM
-    '=IFERROR(ROUND(' + spend + '/' + imp + '*1000,1),"")');
-  sheet.getRange(row, 10).setFormula( // ⑥CTR
-    '=IFERROR(TEXT(' + click + '/' + imp + ',"0.00%"),"")');
-  sheet.getRange(row, 12).setFormula( // ⑧LP遷移率
-    '=IFERROR(TEXT(' + lp + '/' + click + ',"0.00%"),"")');
-  sheet.getRange(row, 13).setFormula( // ⑨LPCVR
-    '=IFERROR(TEXT(' + cv + '/' + lp + ',"0.00%"),"")');
-  sheet.getRange(row, 15).setFormula( // ⑬CVR
-    '=IFERROR(TEXT(' + cv + '/' + click + ',"0.00%"),"")');
-  sheet.getRange(row, 16).setFormula( // ⑭CPA
-    '=IF(' + cv + '=0,"‐",IFERROR(ROUND(' + spend + '/' + cv + ',0),"‐"))');
+  sheet.getRange(row, 6).setFormula('=IFERROR(ROUND(' + spend + '/' + click + ',1),"")');
+  sheet.getRange(row, 7).setFormula('=IFERROR(ROUND(' + spend + '/' + imp + '*1000,1),"")');
+  sheet.getRange(row, 10).setFormula('=IFERROR(TEXT(' + click + '/' + imp + ',"0.00%"),"")');
+  sheet.getRange(row, 12).setFormula('=IFERROR(TEXT(' + lp + '/' + click + ',"0.00%"),"")');
+  sheet.getRange(row, 13).setFormula('=IFERROR(TEXT(' + cv + '/' + lp + ',"0.00%"),"")');
+  sheet.getRange(row, 15).setFormula('=IFERROR(TEXT(' + cv + '/' + click + ',"0.00%"),"")');
+  sheet.getRange(row, 16).setFormula('=IF(' + cv + '=0,"‐",IFERROR(ROUND(' + spend + '/' + cv + ',0),"‐"))');
 }
 
 // ================================================
 // コンバージョン名一覧確認
 // ================================================
-function listConversionEventsWhite() {
+function listConversionEventsRelive() {
   var ui    = SpreadsheetApp.getUi();
   var props = PropertiesService.getScriptProperties();
   var user  = props.getProperty('OB_USERNAME');
   var pass  = props.getProperty('OB_PASSWORD');
-  var mid   = MARKETER_ID_WHITE;
+  var mid   = MARKETER_ID_RELIVE;
 
   if (!user || !pass) {
     ui.alert('OB_USERNAMEとOB_PASSWORDを設定してください。');
     return;
   }
 
-  var token = getOutbrainTokenWhite(user, pass);
+  var token = getOutbrainTokenRelive(user, pass);
   if (!token) { ui.alert('認証失敗'); return; }
 
-  // 1キャンペーンのレポートを取得してコンバージョン名を確認
-  var today     = new Date();
-  var weekAgo   = new Date(today.getTime() - 7 * 24 * 60 * 60 * 1000);
-  var from      = formatDateForAPIWhite(weekAgo);
-  var to        = formatDateForAPIWhite(today);
-  var url       = BASE_URL + '/reports/marketers/' + mid + '/campaigns/periodic?from=' + from + '&to=' + to + '&breakdown=daily&limit=5';
+  var today   = new Date();
+  var weekAgo = new Date(today.getTime() - 7 * 24 * 60 * 60 * 1000);
+  var from    = formatDateForAPIRelive(weekAgo);
+  var to      = formatDateForAPIRelive(today);
+  var url     = BASE_URL + '/reports/marketers/' + mid +
+                '/campaigns/periodic?from=' + from + '&to=' + to +
+                '&includeConversionDetails=true&limit=3';
 
   try {
     var resp = UrlFetchApp.fetch(url, { headers: { 'OB-TOKEN-V1': token }, muteHttpExceptions: true });
@@ -842,7 +690,7 @@ function listConversionEventsWhite() {
     (data.campaignResults || []).forEach(function(camp) {
       (camp.results || []).forEach(function(r) {
         var m = r.metrics || {};
-        (m.conversionsByType || m.conversionsByName || []).forEach(function(cv) {
+        (m.conversionMetrics || m.conversionsByType || m.conversionsByName || []).forEach(function(cv) {
           var n = cv.name || cv.eventName || cv.type || '';
           if (n) names[n] = true;
         });
@@ -851,12 +699,19 @@ function listConversionEventsWhite() {
 
     var nameList = Object.keys(names);
     if (nameList.length > 0) {
-      ui.alert('コンバージョン名一覧:\n' + nameList.join('\n') +
-               '\n\nスクリプトプロパティに設定してください。');
+      Logger.log('コンバージョン名一覧:\n' + nameList.join('\n'));
+      ui.alert(
+        'コンバージョン名一覧:\n' + nameList.join('\n') +
+        '\n\n上記の名前をコードの定数（LP_CONV_DEFAULT_RELIVE等）に設定してください。\n' +
+        'Logsにも出力しています。'
+      );
     } else {
-      Logger.log('コンバージョン名が見つかりません。レスポンス例:\n' + JSON.stringify(data).substring(0, 500));
-      ui.alert('コンバージョン名が見つかりませんでした。\nLogsで詳細を確認してください。\n\n' +
-               '注意: LP遷移数などはOutbrain管理画面でコンバージョンとして設定する必要があります。');
+      Logger.log('コンバージョン名が見つかりません。レスポンス:\n' + JSON.stringify(data).substring(0, 800));
+      ui.alert(
+        'コンバージョン名が見つかりませんでした。\n' +
+        'Logsで詳細を確認してください。\n\n' +
+        '注意: コンバージョンはOutbrain管理画面で設定されている必要があります。'
+      );
     }
   } catch(e) {
     Logger.log('listConversionEvents 例外: ' + e.toString());
@@ -867,10 +722,10 @@ function listConversionEventsWhite() {
 // ================================================
 // 設定ガイド
 // ================================================
-function showSetupGuideWhite() {
+function showSetupGuideRelive() {
   var html = HtmlService.createHtmlOutput(
     '<html><body style="font-family:Noto Sans JP,sans-serif;padding:15px;font-size:13px;">' +
-    '<h3 style="color:#4472C4">ホワイトOutbrain数値集計 - 設定ガイド</h3>' + // ★変更
+    '<h3 style="color:#4472C4">リライブシャツコア Outbrain数値集計 - 設定ガイド</h3>' +
     '<h4>① スクリプトプロパティの設定</h4>' +
     '<p>Apps Script エディタで：<br>' +
     '<b>プロジェクトの設定（歯車アイコン）→ スクリプトプロパティ</b> に以下を追加：</p>' +
@@ -878,51 +733,51 @@ function showSetupGuideWhite() {
     '<tr><th>プロパティ名</th><th>値</th></tr>' +
     '<tr><td>OB_USERNAME</td><td>Outbrainのメールアドレス</td></tr>' +
     '<tr><td>OB_PASSWORD</td><td>Outbrainのパスワード</td></tr>' +
-    '<tr><td>OB_MARKETER_ID</td><td>0033e4d3d312b31c84630c2166acec7b27</td></tr>' + // ★変更
     '</table>' +
-    '<p>コンバージョン名は以下で固定設定済み（変更不要）：</p>' +
+    '<p>マーケターID（コードに直接埋め込み済み・設定不要）：<br>' +
+    '<b>00797d88f6ed45a3f31b85ed0d47644568</b></p>' +
+    '<h4>② コンバージョン名の設定（初回必須）</h4>' +
+    '<p>「📋 コンバージョン名を確認」メニューを実行して、実際のAPI名を確認してください。<br>' +
+    'コード冒頭の定数を更新：</p>' +
     '<ul>' +
-    '<li>⑦LP遷移数 → <b>01LP Conversions (Click)</b></li>' +         // ★変更
-    '<li>⑩確認画面遷移数 → <b>02 confirm 1day Conversions (Click)</b></li>' + // ★変更
-    '<li>⑫CV数 → <b>thanks 1day Conversions (Click)</b></li>' +      // ★変更
+    '<li>LP_CONV_DEFAULT_RELIVE → LP遷移数のコンバージョン名</li>' +
+    '<li>CONFIRM_CONV_DEFAULT_RELIVE → 確認画面遷移数のコンバージョン名</li>' +
+    '<li>CV_CONV_DEFAULT_RELIVE → CV数のコンバージョン名</li>' +
     '</ul>' +
-    '<h4>② レポート実行</h4>' +
+    '<h4>③ レポート実行</h4>' +
     '<ol>' +
-    '<li>「数値集計②」シートのC2に開始日を入力（例: 2026/04/01）</li>' + // ★変更
-    '<li>C3に終了日を入力（例: 2026/04/04）</li>' +
-    '<li>メニュー「ホワイトOutbrainレポート ▶ レポート取得実行」をクリック</li>' + // ★変更
+    '<li>「数値集計」シートのC2に開始日を入力（例: 2026/04/01）</li>' +
+    '<li>C3に終了日を入力</li>' +
+    '<li>メニュー「▶ レポート取得実行」をクリック</li>' +
     '</ol>' +
-    '<h4>③ コンバージョン名の確認</h4>' +
-    '<p>「コンバージョン名を確認」メニューを使うと、設定されているコンバージョン名を確認できます。</p>' +
-    '<p><b>注意：</b>LP遷移数・確認画面遷移数は、Outbrain管理画面でコンバージョンとして設定されている必要があります。</p>' +
     '<button onclick="google.script.host.close()" style="margin-top:10px;padding:5px 15px;">閉じる</button>' +
     '</body></html>'
-  ).setWidth(560).setHeight(500);
-  SpreadsheetApp.getUi().showModalDialog(html, 'ホワイトOutbrain設定ガイド'); // ★変更
+  ).setWidth(560).setHeight(520);
+  SpreadsheetApp.getUi().showModalDialog(html, 'リライブシャツコア 設定ガイド');
 }
 
 // ================================================
 // APIデバッグ：breakdownパラメータ別にレスポンスを確認
 // ================================================
-function debugApiBreakdownsWhite() {
+function debugApiBreakdownsRelive() {
   var props      = PropertiesService.getScriptProperties();
   var username   = props.getProperty('OB_USERNAME');
   var password   = props.getProperty('OB_PASSWORD');
-  var marketerId = MARKETER_ID_WHITE;
+  var marketerId = MARKETER_ID_RELIVE;
 
-  var token = getOutbrainTokenWhite(username, password);
+  var token = getOutbrainTokenRelive(username, password);
   if (!token) { SpreadsheetApp.getUi().alert('認証失敗'); return; }
 
-  var from = '2026-04-01';
-  var to   = '2026-04-04';
-  var baseParams = '?from=' + from + '&to=' + to + '&limit=5';
+  var today    = new Date();
+  var weekAgo  = new Date(today.getTime() - 7 * 24 * 60 * 60 * 1000);
+  var from     = formatDateForAPIRelive(weekAgo);
+  var to       = formatDateForAPIRelive(today);
+  var baseParams = '?from=' + from + '&to=' + to + '&limit=3';
 
   var tests = [
-    { label: 'breakdown=conversionGoal', url: BASE_URL + '/reports/marketers/' + marketerId + '/campaigns/periodic' + baseParams + '&breakdown=conversionGoal' },
-    { label: 'breakdown=promotedLink',   url: BASE_URL + '/reports/marketers/' + marketerId + '/campaigns/periodic' + baseParams + '&breakdown=promotedLink' },
-    { label: 'breakdown=content',        url: BASE_URL + '/reports/marketers/' + marketerId + '/campaigns/periodic' + baseParams + '&breakdown=content' },
-    { label: 'breakdown=section',        url: BASE_URL + '/reports/marketers/' + marketerId + '/campaigns/periodic' + baseParams + '&breakdown=section' },
-    { label: 'no breakdown',             url: BASE_URL + '/reports/marketers/' + marketerId + '/campaigns/periodic' + baseParams }
+    { label: 'includeConversionDetails', url: BASE_URL + '/reports/marketers/' + marketerId + '/campaigns/periodic' + baseParams + '&includeConversionDetails=true' },
+    { label: 'no breakdown',             url: BASE_URL + '/reports/marketers/' + marketerId + '/campaigns/periodic' + baseParams },
+    { label: 'promotedContent',          url: BASE_URL + '/reports/marketers/' + marketerId + '/promotedContent' + baseParams + '&includeConversionDetails=true' }
   ];
 
   tests.forEach(function(t) {
@@ -933,7 +788,7 @@ function debugApiBreakdownsWhite() {
       });
       Logger.log('=== ' + t.label + ' ===');
       Logger.log('status: ' + resp.getResponseCode());
-      Logger.log('response: ' + resp.getContentText().substring(0, 800));
+      Logger.log('response: ' + resp.getContentText().substring(0, 1000));
     } catch(e) {
       Logger.log('=== ' + t.label + ' 例外: ' + e.toString());
     }

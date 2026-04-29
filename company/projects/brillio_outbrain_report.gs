@@ -24,8 +24,9 @@ var LP_CONV_DEFAULT      = '01 LP 01d';          // → ⑦LP遷移数
 var CONFIRM_CONV_DEFAULT = '02 confirm 01d';      // → ⑩確認画面遷移数
 var CV_CONV_DEFAULT      = '03 all thanks 01d';   // → ⑫CV数
 
-var BASE_URL    = 'https://api.outbrain.com/amplify/v0.1';
-var SHEET_NAME  = '数値集計';
+var BASE_URL          = 'https://api.outbrain.com/amplify/v0.1';
+var SHEET_NAME        = '数値集計';
+var SECTION_SHEET_NAME = '掲載面集計';
 
 var TOKEN_CACHE_KEY    = 'OB_TOKEN_CACHE';
 var TOKEN_CACHE_TS_KEY = 'OB_TOKEN_CACHE_TS';
@@ -46,8 +47,10 @@ function onOpen() {
   // ブリリオ
   ui.createMenu('🔧 ブリリオOBレポート')
     .addItem('▶ レポート取得実行', 'runOutbrainReport')
+    .addItem('▶ 掲載面集計実行', 'runSectionReport')
     .addSeparator()
     .addItem('🔍 APIデバッグ実行', 'debugApiBreakdowns')
+    .addItem('🔍 掲載面APIデバッグ', 'debugSectionApi')
     .addItem('📋 コンバージョン名を確認', 'listConversionEvents')
     .addItem('⚙ 設定ガイド', 'showSetupGuide')
     .addToUi();
@@ -572,9 +575,11 @@ function writeToSheet(sheet, cpnData, crData, startDate, endDate) {
   // セクションタイトル
   var cpnTitleCell = sheet.getRange(currentRow, 2);
   cpnTitleCell.setValue('■ CPN別集計　（' + startDate + ' 〜 ' + endDate + '）');
-  cpnTitleCell.setFontWeight('bold').setFontSize(11)
-              .setBackground('#4472C4').setFontColor('#FFFFFF');
-  sheet.getRange(currentRow, 2, 1, 15).setBackground('#4472C4');
+  cpnTitleCell.setFontWeight('bold').setFontSize(12)
+              .setBackground('#4472C4').setFontColor('#FFFFFF')
+              .setVerticalAlignment('middle');
+  sheet.getRange(currentRow, 2, 1, 15).setBackground('#4472C4')
+       .setFontSize(12).setVerticalAlignment('middle');
   currentRow++;
 
   // ヘッダー行
@@ -589,7 +594,8 @@ function writeToSheet(sheet, cpnData, crData, startDate, endDate) {
   var cpnHeaderRow = currentRow;
   sheet.getRange(cpnHeaderRow, 2, 1, cpnHeaders.length).setValues([cpnHeaders]);
   sheet.getRange(cpnHeaderRow, 2, 1, cpnHeaders.length)
-       .setFontWeight('bold').setBackground('#DCE6F1').setHorizontalAlignment('center');
+       .setFontWeight('bold').setBackground('#DCE6F1').setHorizontalAlignment('center')
+       .setFontSize(12).setVerticalAlignment('middle');
   currentRow++;
 
   // データ行
@@ -615,6 +621,9 @@ function writeToSheet(sheet, cpnData, crData, startDate, endDate) {
       ];
     });
     sheet.getRange(cpnStartRow, 2, cpnValues.length, 15).setValues(cpnValues);
+
+    // フォントサイズ・縦揃え
+    sheet.getRange(cpnStartRow, 2, cpnData.length, 15).setFontSize(12).setVerticalAlignment('middle');
 
     // 数値列を右揃え（C列=3 〜 P列=16 の14列、B列=CPN名は除く）
     sheet.getRange(cpnStartRow, 3, cpnData.length, 14).setHorizontalAlignment('right');
@@ -646,9 +655,11 @@ function writeToSheet(sheet, cpnData, crData, startDate, endDate) {
   // ===================================================
   var crTitleCell = sheet.getRange(currentRow, 2);
   crTitleCell.setValue('■ CR別集計　（' + startDate + ' 〜 ' + endDate + '）');
-  crTitleCell.setFontWeight('bold').setFontSize(11)
-             .setBackground('#375623').setFontColor('#FFFFFF');
-  sheet.getRange(currentRow, 2, 1, 17).setBackground('#375623');
+  crTitleCell.setFontWeight('bold').setFontSize(12)
+             .setBackground('#375623').setFontColor('#FFFFFF')
+             .setVerticalAlignment('middle');
+  sheet.getRange(currentRow, 2, 1, 15).setBackground('#375623')
+       .setFontSize(12).setVerticalAlignment('middle');
   currentRow++;
 
   // CR ヘッダー行
@@ -657,13 +668,13 @@ function writeToSheet(sheet, cpnData, crData, startDate, endDate) {
     '①配信金額', '②CPC', '③CPM',
     '④Imp', '⑤Click', '⑥CTR',
     '⑦LP遷移数', '⑧LP遷移率', '⑨LPCVR',
-    '⑩確認画面遷移数', '⑪確認画面遷移率',
     '⑫CV数', '⑬CVR', '⑭CPA'
   ];
   var crHeaderRow = currentRow;
   sheet.getRange(crHeaderRow, 2, 1, crHeaders.length).setValues([crHeaders]);
   sheet.getRange(crHeaderRow, 2, 1, crHeaders.length)
-       .setFontWeight('bold').setBackground('#E2EFDA').setHorizontalAlignment('center');
+       .setFontWeight('bold').setBackground('#E2EFDA').setHorizontalAlignment('center')
+       .setFontSize(12).setVerticalAlignment('middle');
   currentRow++;
 
   // CR データ行
@@ -683,25 +694,25 @@ function writeToSheet(sheet, cpnData, crData, startDate, endDate) {
         d.lpCount,        // K: ⑦LP遷移数
         '',               // L: ⑧LP遷移率 (計算)
         '',               // M: ⑨LPCVR (計算)
-        d.confirmCount,   // N: ⑩確認画面遷移数
-        '',               // O: ⑪確認画面遷移率 (計算)
-        d.cvCount,        // P: ⑫CV数
-        '',               // Q: ⑬CVR (計算)
-        ''                // R: ⑭CPA (計算)
+        d.cvCount,        // N: ⑫CV数
+        '',               // O: ⑬CVR (計算)
+        ''                // P: ⑭CPA (計算)
       ];
     });
     sheet.getRange(crStartRow, 2, crValues.length, crHeaders.length).setValues(crValues);
 
-    // 数値列を右揃え（E列=5 〜 R列=18 の14列、B=CPN名/C=画像/D=タイトルは除く）
-    sheet.getRange(crStartRow, 5, crData.length, 14).setHorizontalAlignment('right');
+    // フォントサイズ・縦揃え
+    sheet.getRange(crStartRow, 2, crData.length, crHeaders.length).setFontSize(12).setVerticalAlignment('middle');
+
+    // 数値列を右揃え（E列=5 〜 P列=16 の12列、B=CPN名/C=画像/D=タイトルは除く）
+    sheet.getRange(crStartRow, 5, crData.length, 12).setHorizontalAlignment('right');
 
     // 数値フォーマット
     sheet.getRange(crStartRow, 5, crData.length, 1).setNumberFormat('¥#,##0');   // 配信金額
     sheet.getRange(crStartRow, 8, crData.length, 1).setNumberFormat('#,##0');    // Imp
     sheet.getRange(crStartRow, 9, crData.length, 1).setNumberFormat('#,##0');    // Click
     sheet.getRange(crStartRow, 11, crData.length, 1).setNumberFormat('#,##0');   // LP遷移数
-    sheet.getRange(crStartRow, 14, crData.length, 1).setNumberFormat('#,##0');   // 確認画面遷移数
-    sheet.getRange(crStartRow, 16, crData.length, 1).setNumberFormat('#,##0');   // CV数
+    sheet.getRange(crStartRow, 14, crData.length, 1).setNumberFormat('#,##0');   // CV数
 
     // 画像と計算列のフォーミュラ
     for (var j = 0; j < crData.length; j++) {
@@ -766,7 +777,7 @@ function setCpnFormulas(sheet, row) {
   sheet.getRange(row, 15).setFormula( // ⑬CVR
     '=IFERROR(TEXT(' + cv + '/' + click + ',"0.00%"),"")');
   sheet.getRange(row, 16).setFormula( // ⑭CPA
-    '=IFERROR(ROUND(' + spend + '/' + cv + ',0),"")');
+    '=IF(' + cv + '=0,"‐",IFERROR(ROUND(' + spend + '/' + cv + ',0),"‐"))');
 }
 
 // ================================================
@@ -775,14 +786,13 @@ function setCpnFormulas(sheet, row) {
 // 列: B=2(CPN名), C=3(画像), D=4(タイトル),
 //     E=5(配信金額), F=6(CPC), G=7(CPM), H=8(Imp), I=9(Click),
 //     J=10(CTR), K=11(LP遷移数), L=12(LP遷移率), M=13(LPCVR),
-//     N=14(確認画面), O=15(確認画面率), P=16(CV数), Q=17(CVR), R=18(CPA)
+//     N=14(CV数), O=15(CVR), P=16(CPA)
 function setCrFormulas(sheet, row) {
   var spend   = 'E' + row;
   var imp     = 'H' + row;
   var click   = 'I' + row;
   var lp      = 'K' + row;
-  var confirm = 'N' + row;
-  var cv      = 'P' + row;
+  var cv      = 'N' + row;
 
   sheet.getRange(row, 6).setFormula(  // ②CPC
     '=IFERROR(ROUND(' + spend + '/' + click + ',1),"")');
@@ -794,12 +804,10 @@ function setCrFormulas(sheet, row) {
     '=IFERROR(TEXT(' + lp + '/' + click + ',"0.00%"),"")');
   sheet.getRange(row, 13).setFormula( // ⑨LPCVR
     '=IFERROR(TEXT(' + cv + '/' + lp + ',"0.00%"),"")');
-  sheet.getRange(row, 15).setFormula( // ⑪確認画面遷移率
-    '=IFERROR(TEXT(' + confirm + '/' + click + ',"0.00%"),"")');
-  sheet.getRange(row, 17).setFormula( // ⑬CVR
+  sheet.getRange(row, 15).setFormula( // ⑬CVR
     '=IFERROR(TEXT(' + cv + '/' + click + ',"0.00%"),"")');
-  sheet.getRange(row, 18).setFormula( // ⑭CPA
-    '=IFERROR(ROUND(' + spend + '/' + cv + ',0),"")');
+  sheet.getRange(row, 16).setFormula( // ⑭CPA
+    '=IF(' + cv + '=0,"‐",IFERROR(ROUND(' + spend + '/' + cv + ',0),"‐"))');
 }
 
 // ================================================
@@ -892,6 +900,383 @@ function showSetupGuide() {
     '</body></html>'
   ).setWidth(560).setHeight(500);
   SpreadsheetApp.getUi().showModalDialog(html, 'Outbrain設定ガイド');
+}
+
+// ================================================
+// 掲載面集計 メイン実行（メニューから呼び出し）
+// ================================================
+function runSectionReport() {
+  var ui = SpreadsheetApp.getUi();
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+
+  // シートがなければ初期化
+  var sheet = ss.getSheetByName(SECTION_SHEET_NAME);
+  if (!sheet) {
+    sheet = setupSectionSheet(ss);
+  }
+
+  var startVal = sheet.getRange('C2').getValue();
+  var endVal   = sheet.getRange('C3').getValue();
+  var cpnSel   = sheet.getRange('C4').getValue() || '全体';
+
+  if (!startVal || !endVal) {
+    ui.alert('開始日（C2）と終了日（C3）を入力してください。\n例: 2026/04/01');
+    return;
+  }
+
+  var startDate = formatDateForAPI(startVal);
+  var endDate   = formatDateForAPI(endVal);
+
+  if (!startDate || !endDate) {
+    ui.alert('日付の形式が正しくありません。\n例: 2026/04/01');
+    return;
+  }
+
+  var props      = PropertiesService.getScriptProperties();
+  var username   = props.getProperty('OB_USERNAME');
+  var password   = props.getProperty('OB_PASSWORD');
+  var marketerId = props.getProperty('OB_MARKETER_ID') || '00af75b8e5565b04764d17c4f90cb25caf';
+  var cvConv     = props.getProperty('CV_CONV_NAME') || CV_CONV_DEFAULT;
+
+  if (!username || !password) {
+    ui.alert('OB_USERNAME / OB_PASSWORD が未設定です。');
+    return;
+  }
+
+  var token = getOutbrainToken(username, password);
+  if (!token) {
+    ui.alert('Outbrain認証失敗。メールアドレス・パスワードを確認してください。');
+    return;
+  }
+
+  var campaignMap = buildCampaignMap(token, marketerId);
+
+  // 期間中に配信があったCPN一覧を取得
+  var cpnData = getCampaignReport(token, marketerId, startDate, endDate,
+                  LP_CONV_DEFAULT, CONFIRM_CONV_DEFAULT, CV_CONV_DEFAULT, campaignMap);
+  var activeCampaignIds = cpnData.map(function(d) { return d.campaignId; });
+
+  if (activeCampaignIds.length === 0) {
+    ui.alert('指定期間に配信データがありませんでした。');
+    return;
+  }
+
+  // C4のドロップダウンを配信CPNで更新
+  updateCpnDropdown(sheet, cpnData);
+
+  // 選択CPNのIDを逆引き（全体の場合は null）
+  var targetCpnId = null;
+  if (cpnSel !== '全体') {
+    for (var id in campaignMap) {
+      if (campaignMap[id] === cpnSel) {
+        targetCpnId = id;
+        break;
+      }
+    }
+    if (!targetCpnId) {
+      ui.alert('選択されたCPN「' + cpnSel + '」が期間中の配信データに見つかりません。\n「全体」に切り替えて再実行してください。');
+      return;
+    }
+  }
+
+  Logger.log('掲載面集計開始: ' + startDate + ' 〜 ' + endDate + ' / CPN=' + cpnSel);
+  var sectionData = getSectionData(token, marketerId, activeCampaignIds, targetCpnId, startDate, endDate, cvConv);
+  Logger.log('取得掲載面数（上位20件まで）: ' + sectionData.length);
+
+  writeSectionSheet(sheet, sectionData, startDate, endDate, cpnSel);
+  SpreadsheetApp.flush();
+
+  ui.alert(
+    '掲載面集計完了！\n' +
+    '対象: ' + cpnSel + '\n' +
+    '掲載面数: ' + sectionData.length + '件（上位20件）'
+  );
+}
+
+// ================================================
+// 掲載面集計シート初期化
+// ================================================
+function setupSectionSheet(ss) {
+  ss = ss || SpreadsheetApp.getActiveSpreadsheet();
+  var sheet = ss.getSheetByName(SECTION_SHEET_NAME);
+  if (!sheet) {
+    sheet = ss.insertSheet(SECTION_SHEET_NAME);
+  }
+
+  sheet.getRange('B2').setValue('開始日').setFontWeight('bold').setFontSize(12);
+  sheet.getRange('B3').setValue('終了日').setFontWeight('bold').setFontSize(12);
+  sheet.getRange('B4').setValue('CPN選択').setFontWeight('bold').setFontSize(12);
+  sheet.getRange('C4').setValue('全体');
+
+  var rule = SpreadsheetApp.newDataValidation()
+    .requireValueInList(['全体'], true)
+    .build();
+  sheet.getRange('C4').setDataValidation(rule);
+
+  sheet.setColumnWidth(2, 100);
+  sheet.setColumnWidth(3, 220);
+
+  return sheet;
+}
+
+// ================================================
+// C4 ドロップダウンを配信CPNで更新
+// ================================================
+function updateCpnDropdown(sheet, cpnData) {
+  var options = ['全体'];
+  cpnData.forEach(function(d) { options.push(d.campaignName); });
+  var rule = SpreadsheetApp.newDataValidation()
+    .requireValueInList(options, true)
+    .build();
+  sheet.getRange('C4').setDataValidation(rule);
+}
+
+// ================================================
+// 掲載面データ取得（上位20件）
+// targetCpnId が null なら全CPN合算、指定なら単一CPN
+// ================================================
+function getSectionData(token, marketerId, activeCampaignIds, targetCpnId, from, to, cvConv) {
+  var sectionMap = {};
+
+  var ids = targetCpnId ? [targetCpnId] : activeCampaignIds;
+
+  ids.forEach(function(campId) {
+    Utilities.sleep(200);
+
+    // publishers/periodic エンドポイントを試みる（breakdown=section は任意）
+    var tryUrls = [
+      BASE_URL + '/reports/marketers/' + marketerId + '/campaigns/' + campId +
+        '/publishers/periodic?from=' + from + '&to=' + to + '&breakdown=section&includeConversionDetails=true&limit=200',
+      BASE_URL + '/reports/marketers/' + marketerId + '/campaigns/' + campId +
+        '/publishers/periodic?from=' + from + '&to=' + to + '&includeConversionDetails=true&limit=200'
+    ];
+
+    for (var i = 0; i < tryUrls.length; i++) {
+      try {
+        var resp = UrlFetchApp.fetch(tryUrls[i], {
+          headers: { 'OB-TOKEN-V1': token },
+          muteHttpExceptions: true
+        });
+        var code = resp.getResponseCode();
+        Logger.log('SectionAPI[' + campId + '][url' + i + '] status=' + code);
+        if (code !== 200) continue;
+
+        var data = JSON.parse(resp.getContentText());
+        var results = data.results || data.publisherResults || [];
+
+        results.forEach(function(item) {
+          var meta = item.metadata || {};
+          // セクション名：APIレスポンスのフィールド名に合わせて複数候補を試みる
+          var sectionName = meta.sectionName || meta.section || meta.publisherName || meta.publisher || '不明';
+          var m = item.metrics || {};
+
+          var cv = 0;
+          (m.conversionMetrics || []).forEach(function(cm) {
+            if ((cm.name || '').trim() === cvConv) cv += (cm.conversions || 0);
+          });
+
+          if (!sectionMap[sectionName]) {
+            sectionMap[sectionName] = { spend: 0, impressions: 0, clicks: 0, cvCount: 0 };
+          }
+          sectionMap[sectionName].spend       += (m.spend       || 0);
+          sectionMap[sectionName].impressions += (m.impressions || 0);
+          sectionMap[sectionName].clicks      += (m.clicks      || 0);
+          sectionMap[sectionName].cvCount     += cv;
+        });
+
+        break; // 成功したら次のURLは試みない
+      } catch(e) {
+        Logger.log('SectionAPI[' + campId + '][url' + i + '] 例外: ' + e.toString());
+      }
+    }
+  });
+
+  // 配列化 → spend降順ソート → 上位20件
+  var arr = Object.keys(sectionMap).map(function(name) {
+    var item = sectionMap[name];
+    return {
+      sectionName: name,
+      spend:       item.spend,
+      impressions: item.impressions,
+      clicks:      item.clicks,
+      cvCount:     item.cvCount
+    };
+  });
+  arr.sort(function(a, b) { return b.spend - a.spend; });
+  return arr.slice(0, 20);
+}
+
+// ================================================
+// 掲載面集計シートへ書き込み
+// ================================================
+function writeSectionSheet(sheet, sectionData, startDate, endDate, selectedCpn) {
+  var lastRow = sheet.getLastRow();
+  if (lastRow >= 6) {
+    sheet.getRange(6, 1, lastRow - 5, 20).clearContent();
+    sheet.getRange(6, 1, lastRow - 5, 20).clearFormat();
+  }
+
+  var currentRow = 6;
+  var label = (selectedCpn === '全体') ? '全体' : selectedCpn;
+
+  // タイトル行
+  sheet.getRange(currentRow, 2).setValue('■ 掲載面集計（' + label + '）　' + startDate + ' 〜 ' + endDate);
+  sheet.getRange(currentRow, 2, 1, 10)
+       .setFontWeight('bold').setFontSize(12)
+       .setBackground('#7030A0').setFontColor('#FFFFFF')
+       .setVerticalAlignment('middle');
+  currentRow++;
+
+  // ヘッダー行
+  var headers = ['掲載面名', '配信金額', 'CPC', 'CPM', 'Imp', 'Click', 'CTR', 'CV数', 'CVR', 'CPA'];
+  sheet.getRange(currentRow, 2, 1, headers.length).setValues([headers]);
+  sheet.getRange(currentRow, 2, 1, headers.length)
+       .setFontWeight('bold').setBackground('#EAD1DC').setHorizontalAlignment('center')
+       .setFontSize(12).setVerticalAlignment('middle');
+  currentRow++;
+
+  // データ行
+  var dataStartRow = currentRow;
+  if (sectionData.length > 0) {
+    var values = sectionData.map(function(d) {
+      return [
+        d.sectionName,
+        convertSpend(d.spend),
+        '', // CPC (計算)
+        '', // CPM (計算)
+        d.impressions,
+        d.clicks,
+        '', // CTR (計算)
+        d.cvCount,
+        '', // CVR (計算)
+        ''  // CPA (計算)
+      ];
+    });
+    sheet.getRange(dataStartRow, 2, values.length, 10).setValues(values);
+    sheet.getRange(dataStartRow, 2, sectionData.length, 10)
+         .setFontSize(12).setVerticalAlignment('middle');
+
+    // 数値フォーマット
+    sheet.getRange(dataStartRow, 3, sectionData.length, 1).setNumberFormat('¥#,##0');  // 配信金額
+    sheet.getRange(dataStartRow, 6, sectionData.length, 1).setNumberFormat('#,##0');   // Imp
+    sheet.getRange(dataStartRow, 7, sectionData.length, 1).setNumberFormat('#,##0');   // Click
+    sheet.getRange(dataStartRow, 9, sectionData.length, 1).setNumberFormat('#,##0');   // CV数
+
+    // 数値列を右揃え（配信金額〜CPA）
+    sheet.getRange(dataStartRow, 3, sectionData.length, 9).setHorizontalAlignment('right');
+
+    // 計算式
+    for (var i = 0; i < sectionData.length; i++) {
+      setSectionFormulas(sheet, dataStartRow + i);
+    }
+
+    // 列幅
+    sheet.setColumnWidth(2, 300);  // 掲載面名
+    sheet.setColumnWidth(3, 110);  // 配信金額
+    sheet.setColumnWidth(4, 80);   // CPC
+    sheet.setColumnWidth(5, 80);   // CPM
+    sheet.setColumnWidth(6, 100);  // Imp
+    sheet.setColumnWidth(7, 80);   // Click
+    sheet.setColumnWidth(8, 75);   // CTR
+    sheet.setColumnWidth(9, 70);   // CV数
+    sheet.setColumnWidth(10, 75);  // CVR
+    sheet.setColumnWidth(11, 90);  // CPA
+  } else {
+    sheet.getRange(currentRow, 2).setValue('(該当期間に掲載面データなし)');
+  }
+
+  Logger.log('掲載面シート書き込み完了。掲載面数: ' + sectionData.length);
+}
+
+// ================================================
+// 掲載面 計算フォーミュラ設定
+// 列: B=2(掲載面名), C=3(配信金額), D=4(CPC), E=5(CPM),
+//     F=6(Imp), G=7(Click), H=8(CTR), I=9(CV数), J=10(CVR), K=11(CPA)
+// ================================================
+function setSectionFormulas(sheet, row) {
+  var spend = 'C' + row;
+  var imp   = 'F' + row;
+  var click = 'G' + row;
+  var cv    = 'I' + row;
+
+  sheet.getRange(row, 4).setFormula('=IFERROR(ROUND(' + spend + '/' + click + ',1),"")');
+  sheet.getRange(row, 5).setFormula('=IFERROR(ROUND(' + spend + '/' + imp + '*1000,1),"")');
+  sheet.getRange(row, 8).setFormula('=IFERROR(TEXT(' + click + '/' + imp + ',"0.00%"),"")');
+  sheet.getRange(row, 10).setFormula('=IFERROR(TEXT(' + cv + '/' + click + ',"0.00%"),"")');
+  sheet.getRange(row, 11).setFormula('=IF(' + cv + '=0,"‐",IFERROR(ROUND(' + spend + '/' + cv + ',0),"‐"))');
+}
+
+// ================================================
+// 掲載面APIデバッグ（レスポンス構造確認用）
+// ================================================
+function debugSectionApi() {
+  var props      = PropertiesService.getScriptProperties();
+  var username   = props.getProperty('OB_USERNAME');
+  var password   = props.getProperty('OB_PASSWORD');
+  var marketerId = props.getProperty('OB_MARKETER_ID') || '00af75b8e5565b04764d17c4f90cb25caf';
+
+  var token = getOutbrainToken(username, password);
+  if (!token) { SpreadsheetApp.getUi().alert('認証失敗'); return; }
+
+  // 数値集計シートの日付を流用（なければ直近7日）
+  var ss      = SpreadsheetApp.getActiveSpreadsheet();
+  var numSheet = ss.getSheetByName(SHEET_NAME);
+  var from, to;
+  if (numSheet) {
+    from = formatDateForAPI(numSheet.getRange('C2').getValue());
+    to   = formatDateForAPI(numSheet.getRange('C3').getValue());
+  }
+  if (!from || !to) {
+    var today   = new Date();
+    var weekAgo = new Date(today.getTime() - 7 * 24 * 60 * 60 * 1000);
+    from = formatDateForAPI(weekAgo);
+    to   = formatDateForAPI(today);
+  }
+
+  // テスト対象：キャンペーン一覧から1件取得
+  var campaignMap = buildCampaignMap(token, marketerId);
+  var campIds     = Object.keys(campaignMap);
+  var testCampId  = campIds[0] || '';
+  Logger.log('テスト対象キャンペーンID: ' + testCampId + ' (' + campaignMap[testCampId] + ')');
+
+  var tests = [
+    {
+      label: 'publishers/periodic（CPN別・breakdown=section）',
+      url: BASE_URL + '/reports/marketers/' + marketerId + '/campaigns/' + testCampId +
+           '/publishers/periodic?from=' + from + '&to=' + to + '&breakdown=section&limit=5'
+    },
+    {
+      label: 'publishers/periodic（CPN別・breakdownなし）',
+      url: BASE_URL + '/reports/marketers/' + marketerId + '/campaigns/' + testCampId +
+           '/publishers/periodic?from=' + from + '&to=' + to + '&limit=5'
+    },
+    {
+      label: 'publishers/periodic（マーケター全体）',
+      url: BASE_URL + '/reports/marketers/' + marketerId +
+           '/publishers/periodic?from=' + from + '&to=' + to + '&limit=5'
+    }
+  ];
+
+  tests.forEach(function(t) {
+    try {
+      var resp = UrlFetchApp.fetch(t.url, {
+        headers: { 'OB-TOKEN-V1': token },
+        muteHttpExceptions: true
+      });
+      Logger.log('=== ' + t.label + ' ===');
+      Logger.log('status: ' + resp.getResponseCode());
+      Logger.log('response: ' + resp.getContentText().substring(0, 1000));
+    } catch(e) {
+      Logger.log('=== ' + t.label + ' 例外: ' + e.toString());
+    }
+    Utilities.sleep(300);
+  });
+
+  SpreadsheetApp.getUi().alert(
+    '掲載面APIデバッグ完了。\nApps Script > ログ を確認してください。\n\n' +
+    'テストキャンペーン: ' + (campaignMap[testCampId] || testCampId) + '\n' +
+    '期間: ' + from + ' 〜 ' + to
+  );
 }
 
 // ================================================

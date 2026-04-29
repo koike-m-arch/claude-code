@@ -34,7 +34,11 @@
       "mcp__google-workspace__update_script_content",
       "mcp__google-workspace__list_scripts",
       "mcp__google-workspace__get_script_content",
-      "mcp__google-workspace__run_script_function"
+      "mcp__google-workspace__run_script_function",
+      "mcp__google-workspace__read_sheet_values",
+      "mcp__chatwork__post_room_message",
+      "mcp__chatwork__list_room_messages",
+      "mcp__chatwork__list_rooms"
     ],
     "deny": []
   },
