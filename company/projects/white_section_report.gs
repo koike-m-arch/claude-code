@@ -1,52 +1,37 @@
 /**
- * ===============================================
- * Outbrain 掲載面集計スクリプト（独立プロジェクト）
- * 対象スプレッドシート：ブリリオ配信戦略
- * 書き込み先シート：掲載面
- * ===============================================
+ * Outbrain 掲載面集計 — ホワイト版（コンテナーバウンド）
+ * 書き込み先: 「掲載面②」タブ
+ * マーケターID: 0033e4d3d312b31c84630c2166acec7b27
+ * GASスクリプトID: 1LNpXzcE-f3Do5_qhAky1V732Qhzj_xWg4wgH-0sM9ZxTP5aZHBAdORKv
  *
- * 【初期設定】
- * Apps Script エディタで「プロジェクトの設定」→「スクリプトプロパティ」に以下を追加：
- *   OB_USERNAME    : Outbrainのログインメールアドレス
- *   OB_PASSWORD    : Outbrainのパスワード
- *   OB_MARKETER_ID : 00af75b8e5565b04764d17c4f90cb25caf  ← ブリリオのID（固定）
- *   LP_CONV_NAME   : LP遷移コンバージョン名（省略時: 01 LP 01d）
- *   CV_CONV_NAME   : CVコンバージョン名（省略時: 03 all thanks 01d）
+ * 【スクリプトプロパティ設定】
+ *   OB_USERNAME  : Outbrainログインメール
+ *   OB_PASSWORD  : Outbrainパスワード
+ *   LP_CONV_NAME : LP遷移コンバージョン名（省略時: 01 LP 01d）
+ *   CV_CONV_NAME : CVコンバージョン名（省略時: 03 all thanks 01d）
  */
 
 var BASE_URL           = 'https://api.outbrain.com/amplify/v0.1';
 var SPREADSHEET_ID     = '1Bk8JBek8dantAlEVPGlSZOsslLaC6aRcUycBf6Z4GY8';
-var SECTION_SHEET_NAME = '掲載面';
+var SECTION_SHEET_NAME = '掲載面②';
 
-var LP_CONV_DEFAULT      = '01 LP 01d';
-var CONFIRM_CONV_DEFAULT = '02 confirm 01d';
-var CV_CONV_DEFAULT      = '03 all thanks 01d';
+var LP_CONV_DEFAULT = '01LP';
+var CV_CONV_DEFAULT = 'thanks 1day';
 
-var TOKEN_CACHE_KEY    = 'OB_SECTION_TOKEN_CACHE';
-var TOKEN_CACHE_TS_KEY = 'OB_SECTION_TOKEN_CACHE_TS';
+var TOKEN_CACHE_KEY    = 'OB_WHITE_SECTION_TOKEN_CACHE';
+var TOKEN_CACHE_TS_KEY = 'OB_WHITE_SECTION_TOKEN_CACHE_TS';
 var TOKEN_TTL_MS       = 4 * 60 * 60 * 1000;
 
 function onOpen() {
   SpreadsheetApp.getUi()
-    .createMenu('📊 掲載面集計')
+    .createMenu('📊 掲載面②')
     .addItem('▶ 掲載面集計実行', 'runSectionReport')
     .addSeparator()
-    .addItem('🔍 掲載面APIデバッグ', 'debugSectionApi')
+    .addItem('🔍 APIデバッグ', 'debugSectionApi')
+    .addItem('🔍 コンバージョン名一覧', 'listConversionNames')
     .addItem('⚙ シート初期化', 'initSectionSheet')
+    .addItem('🔧 タブ名修正（掲載面③→②）', 'renameSheet')
     .addToUi();
-}
-
-function tryAlert(msg) {
-  try { SpreadsheetApp.getUi().alert(msg); } catch(e) { Logger.log('RESULT: ' + msg); }
-}
-
-function installTrigger() {
-  var ss = SpreadsheetApp.openById(SPREADSHEET_ID);
-  ScriptApp.getProjectTriggers().forEach(function(t) {
-    if (t.getHandlerFunction() === 'onOpen') ScriptApp.deleteTrigger(t);
-  });
-  ScriptApp.newTrigger('onOpen').forSpreadsheet(ss).onOpen().create();
-  Logger.log('トリガー登録完了');
 }
 
 function convertSpend(spend) {
@@ -122,9 +107,8 @@ function buildCampaignMap(token, marketerId) {
 function getActiveCampaignIds(token, marketerId, from, to, campaignMap) {
   var results = [];
   try {
-    var url    = BASE_URL + '/reports/marketers/' + marketerId + '/campaigns/periodic';
-    var params = '?from=' + from + '&to=' + to + '&includeConversionDetails=false';
-    var resp   = UrlFetchApp.fetch(url + params, {
+    var url  = BASE_URL + '/reports/marketers/' + marketerId + '/campaigns/periodic';
+    var resp = UrlFetchApp.fetch(url + '?from=' + from + '&to=' + to + '&includeConversionDetails=false', {
       headers: { 'OB-TOKEN-V1': token }, muteHttpExceptions: true
     });
     if (resp.getResponseCode() !== 200) return results;
@@ -144,135 +128,71 @@ function getActiveCampaignIds(token, marketerId, from, to, campaignMap) {
 }
 
 // ================================================
-// 掲載面データ取得（上位20件）
-// lpConv: LP遷移コンバージョン名  cvConv: CVコンバージョン名
+// 掲載面データ取得（上位20件・全CPN合算）
+// ※ includeConversionDetails=true で LP遷移数・CV数をconversionMetricsから取得
 // ================================================
-function getSectionData(token, marketerId, activeCampaignIds, targetCpnId, from, to, lpConv, cvConv) {
-  var sectionMap = {};
-
-  var campaignIdSet = {};
-  if (targetCpnId) {
-    campaignIdSet[targetCpnId] = true;
-  } else {
-    activeCampaignIds.forEach(function(id) { campaignIdSet[id] = true; });
-  }
-
-  // /sections と /publishers は確実に 200 を返す確認済みエンドポイント
-  // publishers/periodic は環境によって 500 になる場合があるため最後尾
-  var baseCD = '?from=' + from + '&to=' + to + '&includeConversionDetails=true&limit=500';
+function getSectionData(token, marketerId, from, to, lpConv, cvConv) {
+  var baseParams = '?from=' + from + '&to=' + to + '&includeConversionDetails=true&limit=500';
   var tryUrls = [
-    BASE_URL + '/reports/marketers/' + marketerId + '/sections'            + baseCD,
-    BASE_URL + '/reports/marketers/' + marketerId + '/publishers'          + baseCD,
-    BASE_URL + '/reports/marketers/' + marketerId + '/publishers/periodic' + baseCD
+    BASE_URL + '/reports/marketers/' + marketerId + '/sections'            + baseParams,
+    BASE_URL + '/reports/marketers/' + marketerId + '/publishers'          + baseParams,
+    BASE_URL + '/reports/marketers/' + marketerId + '/publishers/periodic' + baseParams
   ];
-
-  var succeeded = false;
 
   for (var i = 0; i < tryUrls.length; i++) {
     try {
-      Logger.log('SectionAPI[url' + i + '] ' + tryUrls[i].substring(0, 120));
+      Logger.log('SectionAPI[' + i + '] ' + tryUrls[i].substring(0, 120));
       var resp = UrlFetchApp.fetch(tryUrls[i], {
         headers: { 'OB-TOKEN-V1': token }, muteHttpExceptions: true
       });
       var code = resp.getResponseCode();
-      Logger.log('SectionAPI[url' + i + '] status=' + code);
-      if (code !== 200) {
-        Logger.log('SectionAPI[url' + i + '] error: ' + resp.getContentText().substring(0, 300));
-        continue;
-      }
+      Logger.log('SectionAPI[' + i + '] status=' + code);
+      if (code !== 200) { Logger.log('error: ' + resp.getContentText().substring(0, 200)); continue; }
 
-      var data = JSON.parse(resp.getContentText());
+      var data    = JSON.parse(resp.getContentText());
+      var results = data.results || data.publisherResults || [];
+      Logger.log('SectionAPI[' + i + '] 件数=' + results.length);
+      if (results.length === 0) continue;
 
-      // パターンA: results[] が直接入っている（publishers/periodicなど）
-      var flatResults = data.results || data.publisherResults || [];
-      if (flatResults.length > 0) {
-        Logger.log('SectionAPI パターンA 件数=' + flatResults.length);
-        flatResults.forEach(function(item) {
-          var meta   = item.metadata || {};
-          var campId = meta.campaignId || '';
-          if (campId && !campaignIdSet[campId]) return;
-
-          var sectionName = meta.sectionName || meta.section || meta.publisherName || meta.publisher ||
-                            meta.name || (meta.id ? String(meta.id) : '不明');
-          var m  = item.metrics || {};
-          var lp = 0, cv = 0;
-          (m.conversionMetrics || []).forEach(function(cm) {
-            var name = (cm.name || '').trim();
-            var val  = cm.conversions || 0;
-            if (lpConv && name === lpConv) lp += val;
-            if (name === cvConv) cv += val;
-          });
-          if (cv === 0) cv = m.conversions || 0;
-
-          if (!sectionMap[sectionName]) {
-            sectionMap[sectionName] = { spend: 0, impressions: 0, clicks: 0, lpCount: 0, cvCount: 0 };
-          }
-          sectionMap[sectionName].spend       += (m.spend       || 0);
-          sectionMap[sectionName].impressions += (m.impressions || 0);
-          sectionMap[sectionName].clicks      += (m.clicks      || 0);
-          sectionMap[sectionName].lpCount     += lp;
-          sectionMap[sectionName].cvCount     += cv;
+      var sectionMap = {};
+      results.forEach(function(item) {
+        var meta        = item.metadata || {};
+        var sectionName = meta.name || meta.sectionName || meta.publisherName || meta.publisher || '不明';
+        var m           = item.metrics || {};
+        var lp = 0, cv = 0;
+        (m.conversionMetrics || []).forEach(function(cm) {
+          var name = (cm.name || '').trim();
+          var val  = cm.conversions || 0;
+          if (lpConv && name === lpConv) lp += val;
+          if (cvConv && name === cvConv) cv += val;
         });
-        succeeded = true;
-        break;
-      }
+        if (cv === 0) cv = m.conversions || 0;
 
-      // パターンB: campaignResults[] の中に results[] が入っている（breakdown=section）
-      var campaignResults = data.campaignResults || [];
-      if (campaignResults.length > 0) {
-        Logger.log('SectionAPI パターンB campaignResults件数=' + campaignResults.length);
-        campaignResults.forEach(function(camp) {
-          var campId = camp.campaignId;
-          if (!campaignIdSet[campId]) return;
-          (camp.results || []).forEach(function(r) {
-            var meta        = r.metadata || {};
-            var sectionName = meta.sectionName || meta.section || meta.publisherName || meta.publisher ||
-                              meta.name || (meta.id ? String(meta.id) : '不明');
-            var m  = r.metrics || {};
-            var lp = 0, cv = 0;
-            (m.conversionMetrics || []).forEach(function(cm) {
-              var name = (cm.name || '').trim();
-              var val  = cm.conversions || 0;
-              if (lpConv && name === lpConv) lp += val;
-              if (name === cvConv) cv += val;
-            });
-            if (cv === 0) cv = m.conversions || 0;
+        if (!sectionMap[sectionName]) {
+          sectionMap[sectionName] = { spend: 0, impressions: 0, clicks: 0, lpCount: 0, cvCount: 0 };
+        }
+        sectionMap[sectionName].spend       += (m.spend       || 0);
+        sectionMap[sectionName].impressions += (m.impressions || 0);
+        sectionMap[sectionName].clicks      += (m.clicks      || 0);
+        sectionMap[sectionName].lpCount     += lp;
+        sectionMap[sectionName].cvCount     += cv;
+      });
 
-            if (!sectionMap[sectionName]) {
-              sectionMap[sectionName] = { spend: 0, impressions: 0, clicks: 0, lpCount: 0, cvCount: 0 };
-            }
-            sectionMap[sectionName].spend       += (m.spend       || 0);
-            sectionMap[sectionName].impressions += (m.impressions || 0);
-            sectionMap[sectionName].clicks      += (m.clicks      || 0);
-            sectionMap[sectionName].lpCount     += lp;
-            sectionMap[sectionName].cvCount     += cv;
-          });
-        });
-        succeeded = true;
-        break;
-      }
+      var arr = Object.keys(sectionMap).map(function(name) {
+        var d = sectionMap[name];
+        return { sectionName: name, spend: d.spend, impressions: d.impressions,
+                 clicks: d.clicks, lpCount: d.lpCount, cvCount: d.cvCount };
+      });
+      arr.sort(function(a, b) { return b.spend - a.spend; });
+      return arr.slice(0, 20);
 
-      Logger.log('SectionAPI[url' + i + '] データが空（次のURLを試みます）');
     } catch(e) {
-      Logger.log('SectionAPI[url' + i + '] 例外: ' + e.toString());
+      Logger.log('SectionAPI[' + i + '] 例外: ' + e.toString());
     }
   }
 
-  if (!succeeded) Logger.log('全URLで掲載面データ取得失敗');
-
-  var arr = Object.keys(sectionMap).map(function(name) {
-    var item = sectionMap[name];
-    return {
-      sectionName: name,
-      spend:       item.spend,
-      impressions: item.impressions,
-      clicks:      item.clicks,
-      lpCount:     item.lpCount,
-      cvCount:     item.cvCount
-    };
-  });
-  arr.sort(function(a, b) { return b.spend - a.spend; });
-  return arr.slice(0, 20);
+  Logger.log('全URLで取得失敗');
+  return [];
 }
 
 // ================================================
@@ -280,7 +200,7 @@ function getSectionData(token, marketerId, activeCampaignIds, targetCpnId, from,
 // 列: B=掲載面名 C=配信金額 D=CPC E=CPM F=Imp G=Click H=CTR
 //     I=LP遷移数 J=LP遷移率 K=LPCVR L=CV数 M=CVR N=CPA
 // ================================================
-function writeSectionSheet(sheet, sectionData, startDate, endDate, selectedCpn) {
+function writeSectionSheet(sheet, sectionData, startDate, endDate) {
   var lastRow = sheet.getLastRow();
   if (lastRow >= 6) {
     sheet.getRange(6, 1, lastRow - 5, 20).clearContent();
@@ -288,13 +208,12 @@ function writeSectionSheet(sheet, sectionData, startDate, endDate, selectedCpn) 
   }
 
   var currentRow = 6;
-  var label      = (selectedCpn === '全体') ? '全体' : selectedCpn;
 
   sheet.getRange(currentRow, 2, 1, 13)
-       .setValues([['■ 掲載面集計（' + label + '）　' + startDate + ' 〜 ' + endDate,
+       .setValues([['■ 掲載面集計（ホワイト・全CPN合算）　' + startDate + ' 〜 ' + endDate,
                     '', '', '', '', '', '', '', '', '', '', '', '']])
        .setFontWeight('bold').setFontSize(12)
-       .setBackground('#7030A0').setFontColor('#FFFFFF')
+       .setBackground('#4472C4').setFontColor('#FFFFFF')
        .setVerticalAlignment('middle');
   currentRow++;
 
@@ -302,7 +221,7 @@ function writeSectionSheet(sheet, sectionData, startDate, endDate, selectedCpn) 
                  'LP遷移数', 'LP遷移率', 'LPCVR', 'CV数', 'CVR', 'CPA'];
   sheet.getRange(currentRow, 2, 1, headers.length).setValues([headers]);
   sheet.getRange(currentRow, 2, 1, headers.length)
-       .setFontWeight('bold').setBackground('#EAD1DC').setHorizontalAlignment('center')
+       .setFontWeight('bold').setBackground('#D9E1F2').setHorizontalAlignment('center')
        .setFontSize(12).setVerticalAlignment('middle');
   currentRow++;
 
@@ -326,8 +245,7 @@ function writeSectionSheet(sheet, sectionData, startDate, endDate, selectedCpn) 
       ];
     });
     sheet.getRange(dataStartRow, 2, values.length, 13).setValues(values);
-    sheet.getRange(dataStartRow, 2, sectionData.length, 13)
-         .setFontSize(12).setVerticalAlignment('middle');
+    sheet.getRange(dataStartRow, 2, sectionData.length, 13).setFontSize(12).setVerticalAlignment('middle');
 
     // 数値フォーマット
     sheet.getRange(dataStartRow, 3,  sectionData.length, 1).setNumberFormat('¥#,##0'); // 配信金額
@@ -337,9 +255,7 @@ function writeSectionSheet(sheet, sectionData, startDate, endDate, selectedCpn) 
     sheet.getRange(dataStartRow, 12, sectionData.length, 1).setNumberFormat('#,##0');  // CV数
     sheet.getRange(dataStartRow, 3,  sectionData.length, 13).setHorizontalAlignment('right');
 
-    for (var i = 0; i < sectionData.length; i++) {
-      setSectionFormulas(sheet, dataStartRow + i);
-    }
+    for (var i = 0; i < sectionData.length; i++) { setSectionFormulas(sheet, dataStartRow + i); }
 
     // 列幅
     sheet.setColumnWidth(2,  300); // 掲載面名
@@ -359,7 +275,7 @@ function writeSectionSheet(sheet, sectionData, startDate, endDate, selectedCpn) 
     sheet.getRange(currentRow, 2).setValue('(該当期間に掲載面データなし)');
   }
 
-  Logger.log('掲載面シート書き込み完了。掲載面数: ' + sectionData.length);
+  Logger.log('掲載面シート書き込み完了。件数: ' + sectionData.length);
 }
 
 // 列: B=2(掲載面名) C=3(配信金額) D=4(CPC) E=5(CPM) F=6(Imp) G=7(Click) H=8(CTR)
@@ -388,8 +304,19 @@ function updateCpnDropdown(sheet, cpnList) {
   );
 }
 
+// タブ名「掲載面③」→「掲載面②」にリネームするワンタイム関数
+function renameSheet() {
+  var ss  = SpreadsheetApp.getActiveSpreadsheet();
+  var src = ss.getSheetByName('掲載面③');
+  if (!src) { SpreadsheetApp.getUi().alert('「掲載面③」シートが見つかりませんでした。'); return; }
+  var old = ss.getSheetByName('掲載面②');
+  if (old) ss.deleteSheet(old);
+  src.setName('掲載面②');
+  SpreadsheetApp.getUi().alert('「掲載面③」→「掲載面②」に変更しました。');
+}
+
 function initSectionSheet() {
-  var ss    = SpreadsheetApp.openById(SPREADSHEET_ID);
+  var ss    = SpreadsheetApp.getActiveSpreadsheet();
   var sheet = ss.getSheetByName(SECTION_SHEET_NAME);
   if (!sheet) { sheet = ss.insertSheet(SECTION_SHEET_NAME); }
 
@@ -400,72 +327,57 @@ function initSectionSheet() {
   sheet.getRange('C4').setDataValidation(
     SpreadsheetApp.newDataValidation().requireValueInList(['全体'], true).build()
   );
-  sheet.setColumnWidth(2, 100);
-  sheet.setColumnWidth(3, 220);
-  tryAlert('「掲載面」シートを初期化しました。');
+  sheet.setColumnWidth(2, 100); sheet.setColumnWidth(3, 220);
+  SpreadsheetApp.getUi().alert('「掲載面②」シートを初期化しました。');
 }
 
 function runSectionReport() {
-  var ss    = SpreadsheetApp.openById(SPREADSHEET_ID);
+  var ss    = SpreadsheetApp.getActiveSpreadsheet();
   var sheet = ss.getSheetByName(SECTION_SHEET_NAME);
+
   if (!sheet) {
-    tryAlert('「掲載面」シートが見つかりません。\nメニューの「⚙ シート初期化」を先に実行してください。');
+    SpreadsheetApp.getUi().alert('「掲載面②」シートが見つかりません。\n「⚙ シート初期化」を先に実行してください。');
     return;
   }
 
+  var ui       = SpreadsheetApp.getUi();
   var startVal = sheet.getRange('C2').getValue();
   var endVal   = sheet.getRange('C3').getValue();
-  var cpnSel   = sheet.getRange('C4').getValue() || '全体';
-
-  if (!startVal || !endVal) { tryAlert('開始日（C2）と終了日（C3）を入力してください。'); return; }
+  if (!startVal || !endVal) { ui.alert('開始日（C2）と終了日（C3）を入力してください。'); return; }
 
   var startDate = formatDateForAPI(startVal);
   var endDate   = formatDateForAPI(endVal);
-  if (!startDate || !endDate) { tryAlert('日付の形式が正しくありません。\n例: 2026/04/01'); return; }
+  if (!startDate || !endDate) { ui.alert('日付の形式が正しくありません。\n例: 2026/04/01'); return; }
 
   var props      = PropertiesService.getScriptProperties();
   var username   = props.getProperty('OB_USERNAME');
   var password   = props.getProperty('OB_PASSWORD');
-  var marketerId = props.getProperty('OB_MARKETER_ID') || '00af75b8e5565b04764d17c4f90cb25caf';
+  var marketerId = props.getProperty('OB_MARKETER_ID') || '0033e4d3d312b31c84630c2166acec7b27';
   var lpConv     = props.getProperty('LP_CONV_NAME')   || LP_CONV_DEFAULT;
   var cvConv     = props.getProperty('CV_CONV_NAME')   || CV_CONV_DEFAULT;
 
   if (!username || !password) {
-    tryAlert('OB_USERNAME / OB_PASSWORD が未設定です。\nApps Script > プロジェクトの設定 > スクリプトプロパティ に設定してください。');
+    ui.alert('OB_USERNAME / OB_PASSWORD が未設定です。\nApps Script > プロジェクトの設定 > スクリプトプロパティ に設定してください。');
     return;
   }
 
   var token = getOutbrainToken(username, password);
-  if (!token) { tryAlert('Outbrain認証失敗。'); return; }
+  if (!token) { ui.alert('Outbrain認証失敗。'); return; }
 
   var campaignMap = buildCampaignMap(token, marketerId);
   var cpnList     = getActiveCampaignIds(token, marketerId, startDate, endDate, campaignMap);
-  if (cpnList.length === 0) { tryAlert('指定期間に配信データがありませんでした。'); return; }
+  if (cpnList.length > 0) updateCpnDropdown(sheet, cpnList);
 
-  updateCpnDropdown(sheet, cpnList);
-
-  var targetCpnId = null;
-  if (cpnSel !== '全体') {
-    for (var id in campaignMap) {
-      if (campaignMap[id] === cpnSel) { targetCpnId = id; break; }
-    }
-    if (!targetCpnId) {
-      tryAlert('選択されたCPN「' + cpnSel + '」が期間中の配信データに見つかりません。\n「全体」に切り替えて再実行してください。');
-      return;
-    }
-  }
-
-  var activeCampaignIds = cpnList.map(function(c) { return c.campaignId; });
-  var sectionData = getSectionData(token, marketerId, activeCampaignIds, targetCpnId, startDate, endDate, lpConv, cvConv);
+  Logger.log('掲載面集計開始(ホワイト): ' + startDate + ' 〜 ' + endDate);
+  var sectionData = getSectionData(token, marketerId, startDate, endDate, lpConv, cvConv);
   Logger.log('取得掲載面数: ' + sectionData.length);
 
-  writeSectionSheet(sheet, sectionData, startDate, endDate, cpnSel);
+  writeSectionSheet(sheet, sectionData, startDate, endDate);
   SpreadsheetApp.flush();
 
-  tryAlert(
-    '掲載面集計完了！\n' +
-    '対象: ' + cpnSel + '\n' +
-    '掲載面数: ' + sectionData.length + '件（上位20件）\n\n' +
+  ui.alert(
+    '掲載面集計完了！（ホワイト）\n' +
+    '掲載面数: ' + sectionData.length + '件（上位20件・全CPN合算）\n\n' +
     '⚠ LP遷移数が0の場合、スクリプトプロパティ LP_CONV_NAME を確認してください（現在: ' + lpConv + '）'
   );
 }
@@ -474,12 +386,12 @@ function debugSectionApi() {
   var props      = PropertiesService.getScriptProperties();
   var username   = props.getProperty('OB_USERNAME');
   var password   = props.getProperty('OB_PASSWORD');
-  var marketerId = props.getProperty('OB_MARKETER_ID') || '00af75b8e5565b04764d17c4f90cb25caf';
+  var marketerId = props.getProperty('OB_MARKETER_ID') || '0033e4d3d312b31c84630c2166acec7b27';
 
   var token = getOutbrainToken(username, password);
   if (!token) { Logger.log('認証失敗'); return; }
 
-  var ss    = SpreadsheetApp.openById(SPREADSHEET_ID);
+  var ss    = SpreadsheetApp.getActiveSpreadsheet();
   var sheet = ss.getSheetByName(SECTION_SHEET_NAME);
   var from, to;
   if (sheet) {
@@ -495,8 +407,10 @@ function debugSectionApi() {
   var tests = [
     { label: 'publishers/periodic + includeConversionDetails',
       url: BASE_URL + '/reports/marketers/' + marketerId + '/publishers/periodic?from=' + from + '&to=' + to + '&includeConversionDetails=true&limit=3' },
-    { label: 'sections（periodicなし）',
-      url: BASE_URL + '/reports/marketers/' + marketerId + '/sections?from=' + from + '&to=' + to + '&limit=3' }
+    { label: 'sections + includeConversionDetails',
+      url: BASE_URL + '/reports/marketers/' + marketerId + '/sections?from=' + from + '&to=' + to + '&includeConversionDetails=true&limit=3' },
+    { label: 'publishers + includeConversionDetails',
+      url: BASE_URL + '/reports/marketers/' + marketerId + '/publishers?from=' + from + '&to=' + to + '&includeConversionDetails=true&limit=3' }
   ];
 
   tests.forEach(function(t) {
@@ -510,5 +424,41 @@ function debugSectionApi() {
     }
     Utilities.sleep(300);
   });
-  Logger.log('=== デバッグ完了 ===');
+  Logger.log('=== 完了 ===');
+}
+
+function listConversionNames() {
+  var props      = PropertiesService.getScriptProperties();
+  var username   = props.getProperty('OB_USERNAME');
+  var password   = props.getProperty('OB_PASSWORD');
+  var marketerId = props.getProperty('OB_MARKETER_ID') || '0033e4d3d312b31c84630c2166acec7b27';
+  var token = getOutbrainToken(username, password);
+  if (!token) { Logger.log('認証失敗'); return; }
+
+  var ss   = SpreadsheetApp.getActiveSpreadsheet();
+  var sheet = ss.getSheetByName(SECTION_SHEET_NAME);
+  var from = sheet ? formatDateForAPI(sheet.getRange('C2').getValue()) : null;
+  var to   = sheet ? formatDateForAPI(sheet.getRange('C3').getValue()) : null;
+  if (!from || !to) {
+    var today = new Date();
+    from = formatDateForAPI(new Date(today.getTime() - 7 * 24 * 60 * 60 * 1000));
+    to   = formatDateForAPI(today);
+  }
+
+  var url  = BASE_URL + '/reports/marketers/' + marketerId + '/sections?from=' + from + '&to=' + to + '&includeConversionDetails=true&limit=5';
+  var resp = UrlFetchApp.fetch(url, { headers: { 'OB-TOKEN-V1': token }, muteHttpExceptions: true });
+  Logger.log('status=' + resp.getResponseCode());
+  var data    = JSON.parse(resp.getContentText());
+  var results = data.results || [];
+
+  var names = {};
+  results.forEach(function(item) {
+    (item.metrics.conversionMetrics || []).forEach(function(cm) {
+      names[cm.name] = (names[cm.name] || 0) + (cm.conversions || 0);
+    });
+  });
+
+  Logger.log('=== ホワイト コンバージョン名一覧 ===');
+  Object.keys(names).forEach(function(n) { Logger.log('  "' + n + '" : ' + names[n]); });
+  if (Object.keys(names).length === 0) Logger.log('  (conversionMetrics が空です)');
 }
