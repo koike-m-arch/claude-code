@@ -225,3 +225,4 @@ CV名           : [確定した名前]
 - エンドポイント試行順序は `/sections` → `/publishers` → `publishers/periodic` の順（変更しないこと）
 - CV フォールバックは `if (cv === 0) cv = m.conversions || 0;` で無条件に行う（条件付けると拾えないケースが出る）
 - **CPN名取得には管理APIではなく `/reports/marketers/{id}/campaigns?from=&to=` を使う**（管理APIのIDとreporting APIのIDは別物。`results[].metadata.id` → `results[].metadata.name` でマップを作ること）
+- **個別CPN掲載面フィルタ**: sections/publishers の `metadata` に `campaignId` がないのでURL直書き・JS側フィルタともに不可。`periodic` 系エンドポイント（`campaignResults[]` 構造）を使う必要がある。`publishers/periodic` が500を返すマーケターが存在するため、CPN指定時の試行順は `sections/periodic` → `publishers/periodic` → `sections?&campaignId=ID` → `publishers?&campaignId=ID` の順にする（後者2つはサーバー側フィルタに期待）

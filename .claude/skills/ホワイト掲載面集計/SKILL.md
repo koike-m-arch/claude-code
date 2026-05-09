@@ -8,7 +8,7 @@ description: ホワイトのOutbrain掲載面集計GASを実行するスキル�
 ## 目的
 
 指定した期間でチェルラーホワイトのOutbrain掲載面集計GASを実行し、「掲載面②」タブに上位20件を書き込む。
-**全CPN合算のみ対応**（APIの仕様上CPN別フィルタ不可）。
+C4ドロップダウンで**全体（全CPN合算）または個別CPN**を選択して実行できる。
 
 ## 設定値（固定）
 
@@ -36,11 +36,25 @@ description: ホワイトのOutbrain掲載面集計GASを実行するスキル�
 | G | Click | |
 | H | CTR | 数式（G/F） |
 | I | LP遷移数 | conversionMetrics["01LP"] |
-| J | LP遷移率 | 数式（I/G） |
-| K | LPCVR | 数式（L/I） |
+| J | LP遷移率 | 数式（I/G）。LP遷移数=0のとき「‐」 |
+| K | LPCVR | 数式（L/I）。LP遷移数=0またはCV数=0のとき「‐」 |
 | L | CV数 | conversionMetrics["thanks 1day"]、未マッチ時はm.conversionsをフォールバック |
-| M | CVR | 数式（L/G） |
-| N | CPA | 数式（C/L） |
+| M | CVR | 数式（L/G）。CV数=0のとき「‐」 |
+| N | CPA | 数式（C/L）。CV数=0のとき「‐」 |
+
+## CPN個別フィルタの仕組み（重要）
+
+flat な `/sections` `/publishers` にはレスポンスに campaignId が含まれないため JS側フィルタ不可。
+CPN個別選択時は periodic エンドポイントを優先し、`campaignResults[].campaignId` で JS側フィルタする。
+
+| 順序 | エンドポイント | CPN絞り込み方法 |
+|---|---|---|
+| [0] | `sections/periodic` | JS側で `campaignId` フィルタ |
+| [1] | `publishers/periodic` | JS側で `campaignId` フィルタ |
+| [2] | `sections?campaignId=ID` | サーバー側フィルタ（効く場合あり） |
+| [3] | `publishers?campaignId=ID` | サーバー側フィルタ（効く場合あり） |
+
+全体表示時は `sections` → `publishers` → `publishers/periodic` の順。
 
 ## ブリリオとの違い
 

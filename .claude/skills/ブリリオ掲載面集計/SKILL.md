@@ -8,7 +8,7 @@ description: ブリリオのOutbrain掲載面集計GASを実行するスキル�
 ## 目的
 
 指定した期間でブリリオのOutbrain掲載面集計GASを実行し、「掲載面」タブに上位20件を書き込む。
-**全CPN合算のみ対応**（APIの仕様上CPN別フィルタ不可）。
+C4ドロップダウンで**全体（全CPN合算）または個別CPN**を選択して実行できる。
 
 ## 設定値（固定）
 
@@ -20,7 +20,7 @@ description: ブリリオのOutbrain掲載面集計GASを実行するスキル�
 | 対象シート | `掲載面` |
 | 開始日セル | C2 |
 | 終了日セル | C3 |
-| CPN選択セル | C4（全CPN合算のみ。CPN別はAPI非対応） |
+| CPN選択セル | C4（「全体」または個別CPN名を選択） |
 | LP遷移コンバージョン名 | `01 LP 01d`（スクリプトプロパティ `LP_CONV_NAME` で変更可） |
 | CVコンバージョン名 | `03 all thanks 01d`（スクリプトプロパティ `CV_CONV_NAME` で変更可） |
 
@@ -36,22 +36,28 @@ description: ブリリオのOutbrain掲載面集計GASを実行するスキル�
 | G | Click | |
 | H | CTR | 数式（G/F） |
 | I | LP遷移数 | conversionMetrics["01 LP 01d"] |
-| J | LP遷移率 | 数式（I/G） |
-| K | LPCVR | 数式（L/I） |
+| J | LP遷移率 | 数式（I/G）。LP遷移数=0のとき「‐」 |
+| K | LPCVR | 数式（L/I）。LP遷移数=0またはCV数=0のとき「‐」 |
 | L | CV数 | conversionMetrics["03 all thanks 01d"]、未マッチ時はm.conversionsをフォールバック |
-| M | CVR | 数式（L/G） |
-| N | CPA | 数式（C/L） |
+| M | CVR | 数式（L/G）。CV数=0のとき「‐」 |
+| N | CPA | 数式（C/L）。CV数=0のとき「‐」 |
 
-## APIの制約（重要）
+## CPN個別フィルタの仕組み（重要）
 
-| エンドポイント | 結果 | 備考 |
+flat な `/sections` `/publishers` にはレスポンスに campaignId が含まれないため JS側フィルタ不可。
+CPN個別選択時は periodic エンドポイントを優先し、`campaignResults[].campaignId` で JS側フィルタする。
+
+| 順序 | エンドポイント | CPN絞り込み方法 |
 |---|---|---|
-| `/reports/marketers/{id}/sections` | ✅ 200 | **メイン使用**。エンドポイント順1番目 |
-| `/reports/marketers/{id}/publishers` | ✅ 200 | フォールバック。2番目 |
-| `/reports/marketers/{id}/publishers/periodic` | △ | 3番目（環境によって500になる場合あり） |
-| CPN別エンドポイント各種 | ❌ 500 | 使用不可 |
+| [0] | `sections/periodic` | JS側で `campaignId` フィルタ |
+| [1] | `publishers/periodic` | JS側で `campaignId` フィルタ |
+| [2] | `sections?campaignId=ID` | サーバー側フィルタ（効く場合あり） |
+| [3] | `publishers?campaignId=ID` | サーバー側フィルタ（効く場合あり） |
 
-**CPN別フィルタは不可能**。C4でCPN選択しても全CPN合算データを表示し、その旨をアラートで通知する。
+全体表示時は `sections` → `publishers` → `publishers/periodic` の順。
+
+**CPN IDマッピング**: `campaigns/periodic` の `campaignId` は管理API（`/marketers/{id}/campaigns`）のIDと別物。
+`buildCampaignMap` は `/reports/marketers/{id}/campaigns?from=&to=` を使い、`metadata.id → metadata.name` でマップを作る。
 
 ---
 

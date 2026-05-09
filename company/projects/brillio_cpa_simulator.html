@@ -1,0 +1,392 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ブリリオ OB 粗利シミュレーター</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: -apple-system, 'Segoe UI', sans-serif; background: #f0f2f5; color: #1a1a2e; padding: 20px; }
+    h1 { font-size: 19px; font-weight: 700; }
+    .sub { font-size: 12px; color: #888; margin-top: 3px; margin-bottom: 18px; }
+
+    .layout { display: grid; grid-template-columns: 300px 1fr; gap: 16px; max-width: 1140px; }
+    .card { background: #fff; border-radius: 12px; padding: 18px 20px; box-shadow: 0 1px 4px rgba(0,0,0,.08); }
+    .card-title { font-size: 11px; font-weight: 700; color: #999; text-transform: uppercase; letter-spacing:.05em; margin-bottom: 14px; }
+
+    .field { margin-bottom: 12px; }
+    .field label { display: block; font-size: 12px; font-weight: 600; color: #555; margin-bottom: 4px; }
+    .field input[type=number] {
+      width: 100%; padding: 8px 10px;
+      border: 1.5px solid #e0e0e0; border-radius: 8px;
+      font-size: 15px; font-weight: 600; color: #1a1a2e; outline: none;
+      transition: border-color .15s;
+    }
+    .field input[type=number]:focus { border-color: #4f7cf9; }
+    .field input[type=range] { width: 100%; accent-color: #4f7cf9; cursor: pointer; margin-top: 4px; }
+    .range-labels { display: flex; justify-content: space-between; font-size: 10px; color: #bbb; margin-top: 2px; }
+
+    .right { display: flex; flex-direction: column; gap: 14px; }
+
+    /* CPAスライダー表示 */
+    .cpa-display { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 12px; }
+    .cpa-box { border-radius: 10px; padding: 12px 14px; }
+    .cpa-box.bon { background: #f0f4ff; border: 2px solid #4f7cf9; }
+    .cpa-box.nob { background: #fff8ee; border: 2px solid #f5a623; }
+    .cpa-box .label { font-size: 11px; font-weight: 700; margin-bottom: 4px; }
+    .cpa-box.bon .label { color: #4f7cf9; }
+    .cpa-box.nob .label { color: #f5a623; }
+    .cpa-box .val { font-size: 22px; font-weight: 800; }
+    .cpa-box.bon .val { color: #4f7cf9; }
+    .cpa-box.nob .val { color: #f5a623; }
+    .cpa-box .hint { font-size: 10px; color: #aaa; margin-top: 3px; }
+
+    /* 比較テーブル */
+    .cmp-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    .cmp-table th {
+      padding: 9px 14px; font-size: 12px; font-weight: 700;
+      text-align: center; white-space: nowrap;
+    }
+    .cmp-table th:first-child { text-align: left; color: #999; font-weight: 400; }
+    .th-bon { color: #4f7cf9; background: #f0f4ff; border-radius: 6px 6px 0 0; }
+    .th-nob { color: #f5a623; background: #fff8ee; border-radius: 6px 6px 0 0; }
+    .cmp-table td { padding: 8px 14px; border-top: 1px solid #f4f4f4; vertical-align: middle; }
+    .cmp-table td:first-child { color: #888; font-size: 12px; white-space: nowrap; }
+    .cmp-table td:not(:first-child) { text-align: center; font-size: 14px; font-weight: 600; }
+    .cmp-table tr.hl td { background: #fafbff; }
+    .cmp-table tr.hl td:not(:first-child) { font-size: 16px; font-weight: 800; }
+
+    /* バナー */
+    .banner { padding: 12px 16px; border-radius: 10px; display: flex; align-items: flex-start; gap: 12px; font-size: 14px; font-weight: 700; }
+    .banner .icon { font-size: 20px; line-height: 1; flex-shrink: 0; }
+    .banner.ok      { background: #e8f8f0; color: #1a7a4a; border-left: 4px solid #27ae60; }
+    .banner.neutral { background: #f0f4ff; color: #1740a0; border-left: 4px solid #4f7cf9; }
+    .banner.warn    { background: #fff8e8; color: #7a4a00; border-left: 4px solid #f5a623; }
+    .banner.bad     { background: #fdecea; color: #8a1010; border-left: 4px solid #e74c3c; }
+    .banner .b-sub  { font-size: 12px; font-weight: 400; opacity: .8; margin-top: 3px; line-height: 1.5; }
+
+    /* ゾーンノート */
+    .zone-note { margin-top: 10px; padding: 8px 12px; border-radius: 8px; font-size: 11px; line-height: 1.6; }
+
+    svg#graph { width: 100%; display: block; }
+    .legend-row { display: flex; gap: 18px; flex-wrap: wrap; margin-top: 10px; }
+    .legend-item { display: flex; align-items: center; gap: 6px; font-size: 12px; color: #555; }
+    .legend-swatch { width: 24px; height: 3px; border-radius: 2px; }
+  </style>
+</head>
+<body>
+
+<h1>ブリリオ OB 粗利シミュレーター</h1>
+<p class="sub">同一OB配信実績（同一ネットCPA・同一CV数）でのボーナスあり vs ボーナスなし 粗利比較</p>
+
+<div class="layout">
+
+  <!-- 左：入力 -->
+  <div style="display:flex;flex-direction:column;gap:14px;">
+    <div class="card">
+      <div class="card-title">基本設定</div>
+      <div class="field">
+        <label>グロス配信金額（円）</label>
+        <input type="number" id="gross" value="14773799">
+      </div>
+      <div class="field">
+        <label>目標CPA（円）</label>
+        <input type="number" id="targetCpa" value="12000">
+      </div>
+      <hr style="margin:8px 0;border:none;border-top:1px solid #eee;">
+      <div class="field">
+        <label>マージン率（%）</label>
+        <input type="number" id="margin" value="20">
+      </div>
+      <div class="field">
+        <label>ボーナスクリック率（%）</label>
+        <input type="number" id="bonus" value="10">
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">CPA設定（ボーナスあり基準）</div>
+
+      <div class="cpa-display">
+        <div class="cpa-box bon">
+          <div class="label">ボーナスあり CPA</div>
+          <div class="val" id="cpa-bon-val">¥15,650</div>
+          <div class="hint">グロスCPA（基準値）</div>
+        </div>
+        <div class="cpa-box nob">
+          <div class="label">ボーナスなし CPA</div>
+          <div class="val" id="cpa-nob-val">¥14,227</div>
+          <div class="hint" id="cpa-nob-hint">÷1.1 で自動計算</div>
+        </div>
+      </div>
+
+      <div class="field">
+        <input type="range" id="cpa-slider" min="10000" max="20000" step="100" value="15650">
+        <div class="range-labels"><span>¥10,000</span><span>¥20,000</span></div>
+      </div>
+
+      <div class="zone-note" id="zone-note"></div>
+    </div>
+  </div>
+
+  <!-- 右 -->
+  <div class="right">
+
+    <div id="banner"></div>
+
+    <!-- 比較テーブル -->
+    <div class="card">
+      <div class="card-title">粗利比較テーブル（同一OB実績・同一CV数）</div>
+      <table class="cmp-table">
+        <thead>
+          <tr>
+            <th></th>
+            <th class="th-bon">ボーナスあり</th>
+            <th class="th-nob">ボーナスなし</th>
+          </tr>
+        </thead>
+        <tbody id="cmp-body"></tbody>
+      </table>
+    </div>
+
+    <!-- グラフ -->
+    <div class="card">
+      <div class="card-title">CPA別・実質粗利率グラフ（有効粗利率 = 実質粗利/CV ÷ ボーナスありCPA）</div>
+      <svg id="graph" height="240" viewBox="0 0 700 240"></svg>
+      <div class="legend-row">
+        <div class="legend-item">
+          <div class="legend-swatch" style="background:#4f7cf9;"></div>ボーナスあり
+        </div>
+        <div class="legend-item">
+          <svg width="24" height="3"><line x1="0" y1="1.5" x2="24" y2="1.5" stroke="#f5a623" stroke-width="2.5" stroke-dasharray="6,4"/></svg>ボーナスなし
+        </div>
+        <div class="legend-item">
+          <div style="width:8px;height:8px;border-radius:50%;background:#1a1a2e;border:2px solid #fff;box-shadow:0 0 0 1px #1a1a2e;"></div>現在のCPA
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+const $ = id => document.getElementById(id);
+const fmt  = n => '¥' + Math.round(n).toLocaleString('ja-JP');
+const fmtM = n => n >= 1e8 ? (n/1e8).toFixed(2)+'億' : n >= 1e7 ? (n/1e7).toFixed(1)+'千万' : n >= 1e6 ? (n/1e6).toFixed(1)+'百万' : fmt(n);
+
+// ボーナスあり：実質粗利/CV
+// gross = net/0.8×1.1 → net = gross×0.8/1.1
+// 粗利 = gross - net - penalty = gross×(b+m)/(1+b) - max(0, gross-P)
+function profitCvBon(cpa, P, m, b) {
+  return cpa * (b + m) / (1 + b) - Math.max(0, cpa - P);
+}
+
+// ボーナスなし：実質粗利/CV
+// クライアント請求 = net/0.8 = cpaNob  ※cpaNob = cpaBon/(1+b)
+// 粗利 = cpaNob×m - max(0, cpaNob-P)
+function profitCvNob(cpaBon, P, m, b) {
+  const cpaNob = cpaBon / (1 + b);
+  return cpaNob * m - Math.max(0, cpaNob - P);
+}
+
+function update() {
+  const gross  = +$('gross').value     || 0;
+  const tCpa   = +$('targetCpa').value || 0;
+  const m      = (+$('margin').value   || 0) / 100;
+  const b      = (+$('bonus').value    || 0) / 100;
+  const cpaBon = +$('cpa-slider').value;
+  if (!gross || !tCpa || !cpaBon) return;
+
+  const P      = tCpa * (1 + b);           // ペナルティライン（目標CPA×1.1）
+  const P2     = P * (1 + b);              // ボーナスなしにもペナルティが発生し始めるCPA
+  const cpaNob = cpaBon / (1 + b);         // ボーナスなし時のCPA
+  const netCpa = cpaBon * 0.8 / (1 + b);  // OBへの支払いCPA（両者共通）
+  const cvCount = gross / cpaBon;           // CV数（OB実績共通）
+
+  // --- CPA表示 ---
+  $('cpa-bon-val').textContent = fmt(cpaBon);
+  $('cpa-nob-val').textContent = fmt(Math.round(cpaNob));
+  $('cpa-nob-hint').textContent = `${fmt(cpaBon)} ÷ ${(1+b).toFixed(1)} ≈ ${fmt(Math.round(cpaNob))}`;
+
+  // --- ゾーン判定 ---
+  const penBon = Math.max(0, cpaBon - P);
+  const penNob = Math.max(0, cpaNob - P);
+  const zoneEl = $('zone-note');
+
+  if (cpaBon <= P) {
+    // P以下 = 両者ともペナルティなし
+    zoneEl.style.cssText = 'background:#e8f8f0;color:#1a7a4a;';
+    zoneEl.innerHTML = `<b>ゾーン①</b>：ペナルティなし（CPA ≤ ペナルティライン ${fmt(Math.round(P))}）<br>両者ともペナルティなし。ボーナスありは粗利率 ${((b+m)/(1+b)*100).toFixed(1)}%、ボーナスなしは ${(m/(1+b)*100).toFixed(1)}%。<br>ボーナスありの方が粗利率が高い。`;
+  } else if (cpaBon <= P2) {
+    // P < CPA ≤ P2 = ボーナスありのみペナルティ、ボーナスなしはペナルティなし
+    zoneEl.style.cssText = 'background:#fff8e8;color:#7a4a00;';
+    zoneEl.innerHTML = `<b>ゾーン②</b>：ボーナスありのみペナルティ発生（${fmt(Math.round(P))} ＜ CPA ≤ ${fmt(Math.round(P2))}）<br>ボーナスなしのCPA ${fmt(Math.round(cpaNob))} はペナルティライン以下 → ペナルティなし。<br>それでもボーナスありの方が粗利が多い（差額 = ペナルティライン − ボーナスなしCPA = ${fmt(Math.round(P - cpaNob))}/CV）。`;
+  } else {
+    // P2超 = 両者ともペナルティ → 粗利完全一致
+    zoneEl.style.cssText = 'background:#fff3f3;color:#7a1010;';
+    zoneEl.innerHTML = `<b>ゾーン③</b>：両者ともペナルティ発生（CPA ＞ ${fmt(Math.round(P2))}）<br>ボーナスあり・なしで月次粗利は完全に同額になります。<br>ボーナスなしに切り替えても粗利は増えません（クライアント請求が減るだけ）。`;
+  }
+
+  // --- 粗利計算 ---
+  const pCvBon   = profitCvBon(cpaBon, P, m, b);
+  const pCvNob   = profitCvNob(cpaBon, P, m, b);
+  const totalBon = pCvBon * cvCount;
+  const totalNob = pCvNob * cvCount;
+  const diff     = totalBon - totalNob;
+
+  // クライアント請求額
+  const grossNob = gross / (1 + b);  // ボーナスなし時の請求額
+
+  // --- 比較テーブル ---
+  const rows = [
+    { label: 'クライアント請求額',   bon: fmtM(gross),               nob: fmtM(grossNob),                    hl: false, note: '' },
+    { label: 'グロスCPA',            bon: fmt(cpaBon),               nob: fmt(Math.round(cpaNob)),            hl: false, note: '' },
+    { label: 'ネットCPA（OB支払）',  bon: fmt(Math.round(netCpa)),    nob: `${fmt(Math.round(netCpa))} <span style="color:#27ae60;font-size:11px">✓同じ</span>`, hl: false, note: '' },
+    { label: '基本粗利/CV',          bon: fmt(Math.round(cpaBon*(b+m)/(1+b))), nob: fmt(Math.round(cpaNob*m)), hl: false, note: '' },
+    { label: 'ペナルティ/CV',
+      bon: penBon > 0 ? `<span style="color:#e74c3c">-${fmt(penBon)}</span>` : `<span style="color:#888">なし</span>`,
+      nob: penNob > 0 ? `<span style="color:#e74c3c">-${fmt(Math.round(penNob))}</span>` : `<span style="color:#27ae60">なし</span>`,
+      hl: false, note: '' },
+    { label: '実質粗利/CV',          bon: fmt(Math.round(pCvBon)),    nob: fmt(Math.round(pCvNob)),            hl: true,  note: '' },
+    { label: 'CV数',                 bon: `${Math.round(cvCount).toLocaleString()}件`, nob: `${Math.round(cvCount).toLocaleString()}件 <span style="color:#27ae60;font-size:11px">✓同じ</span>`, hl: false, note: '' },
+    { label: '月次粗利合計',         bon: fmt(Math.round(totalBon)),  nob: fmt(Math.round(totalNob)),          hl: true,  note: '' },
+  ];
+
+  $('cmp-body').innerHTML = rows.map(r =>
+    `<tr${r.hl ? ' class="hl"' : ''}>
+      <td>${r.label}</td>
+      <td>${r.bon}</td>
+      <td>${r.nob}</td>
+    </tr>`
+  ).join('');
+
+  // --- バナー ---
+  const bannerEl = $('banner');
+  if (pCvBon <= 0 && pCvNob <= 0) {
+    bannerEl.className = 'banner bad';
+    bannerEl.innerHTML = `<div class="icon">🔴</div><div><div>両者とも赤字になります</div><div class="b-sub">CPAを下げてください（ゼロ粗利ライン：ボーナスあり ${fmt(Math.round(P*(1+b)/(1-m)))} / ボーナスなし ${fmt(Math.round(P*(1+b)/(1-m)))}）</div></div>`;
+  } else if (Math.abs(diff) < 100) {
+    bannerEl.className = 'banner neutral';
+    bannerEl.innerHTML = `<div class="icon">🔵</div><div><div>ボーナスあり・なしで<strong>月次粗利は同額</strong>です</div><div class="b-sub">CPA ${fmt(cpaBon)} はペナルティライン ${fmt(Math.round(P))} を超過しており、両シナリオで損益が一致するゾーンです。<br>ボーナスなしに切り替えても粗利は増えません（クライアント請求額が ${fmt(Math.round(gross-grossNob))} 減少するだけ）</div></div>`;
+  } else if (diff > 0) {
+    bannerEl.className = 'banner ok';
+    bannerEl.innerHTML = `<div class="icon">✅</div><div><div>ボーナスありの方が月次粗利が <strong>${fmt(Math.round(diff))}</strong> 多い</div><div class="b-sub">ボーナスあり: ${fmt(Math.round(totalBon))} ／ ボーナスなし: ${fmt(Math.round(totalNob))}<br>※ボーナスなしに切り替えても粗利は増えません</div></div>`;
+  } else {
+    bannerEl.className = 'banner warn';
+    bannerEl.innerHTML = `<div class="icon">⚠️</div><div><div>ボーナスなしの方が月次粗利が多い（想定外のケース）</div></div>`;
+  }
+
+  drawGraph(cpaBon, P, P2, tCpa, m, b);
+}
+
+function drawGraph(cpaCur, P, P2, tCpa, m, b) {
+  const W = 700, H = 240;
+  const pad = { top: 20, right: 20, bottom: 42, left: 68 };
+  const gW = W - pad.left - pad.right;
+  const gH = H - pad.top - pad.bottom;
+
+  const xMin = 10000, xMax = 20000;
+  const xS = v => pad.left + (v - xMin) / (xMax - xMin) * gW;
+
+  // 有効粗利率 = 実質粗利/CV ÷ ボーナスありCPA（共通のX軸スケールで比較）
+  const rateBon = cpa => profitCvBon(cpa, P, m, b) / cpa;
+  const rateNob = cpa => profitCvNob(cpa, P, m, b) / cpa;
+
+  const N = 300;
+  const allY = [];
+  for (let i = 0; i <= N; i++) {
+    const cpa = xMin + (xMax - xMin) * i / N;
+    allY.push(rateBon(cpa), rateNob(cpa));
+  }
+  const yMax = Math.max(...allY, 0.01) * 1.15;
+  const yMin = Math.min(...allY, 0) * 1.2;
+  const yS = v => pad.top + (1 - (v - yMin) / (yMax - yMin)) * gH;
+
+  let svg = '';
+
+  // 赤背景（マイナス領域）
+  if (yMin < 0) {
+    const y0 = yS(0);
+    const yBot = yS(yMin);
+    svg += `<rect x="${pad.left}" y="${y0.toFixed(1)}" width="${gW}" height="${(yBot-y0).toFixed(1)}" fill="rgba(231,76,60,0.06)"/>`;
+  }
+
+  // グリッド線
+  for (let i = 0; i <= 5; i++) {
+    const yv = yMin + (yMax - yMin) * i / 5;
+    const yp = yS(yv);
+    svg += `<line x1="${pad.left}" y1="${yp.toFixed(1)}" x2="${pad.left+gW}" y2="${yp.toFixed(1)}" stroke="#f0f0f0" stroke-width="1"/>`;
+    svg += `<text x="${pad.left-5}" y="${(yp+3).toFixed(1)}" text-anchor="end" font-size="9" fill="#aaa">${(yv*100).toFixed(1)}%</text>`;
+  }
+
+  // ゼロライン
+  const yZ = yS(0);
+  svg += `<line x1="${pad.left}" y1="${yZ.toFixed(1)}" x2="${pad.left+gW}" y2="${yZ.toFixed(1)}" stroke="#e74c3c" stroke-width="1" opacity=".4"/>`;
+
+  // 特殊縦線
+  const markers = [
+    { x: tCpa, color: '#27ae60', label: '目標', dash: '3,3' },
+    { x: P,    color: '#f5a623', label: 'PL',   dash: '3,3' },
+    { x: P2,   color: '#e74c3c', label: 'PL×(1+b)', dash: '3,3' },
+  ];
+  markers.forEach(mk => {
+    if (mk.x < xMin || mk.x > xMax) return;
+    const xp = xS(mk.x);
+    svg += `<line x1="${xp.toFixed(1)}" y1="${pad.top}" x2="${xp.toFixed(1)}" y2="${pad.top+gH}" stroke="${mk.color}" stroke-width="1" stroke-dasharray="${mk.dash}" opacity=".5"/>`;
+    svg += `<text x="${(xp+2).toFixed(1)}" y="${(pad.top+11).toFixed(1)}" font-size="8.5" fill="${mk.color}" opacity=".8">${mk.label}</text>`;
+  });
+
+  // X軸ラベル
+  [10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20].forEach(k => {
+    const v = k * 1000;
+    const xp = xS(v);
+    svg += `<line x1="${xp.toFixed(1)}" y1="${pad.top+gH}" x2="${xp.toFixed(1)}" y2="${pad.top+gH+4}" stroke="#ddd"/>`;
+    svg += `<text x="${xp.toFixed(1)}" y="${pad.top+gH+14}" text-anchor="middle" font-size="8.5" fill="#bbb">¥${k}K</text>`;
+  });
+
+  // 枠
+  svg += `<rect x="${pad.left}" y="${pad.top}" width="${gW}" height="${gH}" fill="none" stroke="#e0e0e0"/>`;
+
+  // ボーナスあり曲線（青・実線）
+  let pathBon = '';
+  for (let i = 0; i <= N; i++) {
+    const cpa = xMin + (xMax - xMin) * i / N;
+    const xp = xS(cpa).toFixed(1), yp = yS(rateBon(cpa)).toFixed(1);
+    pathBon += (i === 0 ? `M${xp},${yp}` : ` L${xp},${yp}`);
+  }
+  svg += `<path d="${pathBon}" stroke="#4f7cf9" stroke-width="2.5" fill="none"/>`;
+
+  // ボーナスなし曲線（橙・破線）
+  let pathNob = '';
+  for (let i = 0; i <= N; i++) {
+    const cpa = xMin + (xMax - xMin) * i / N;
+    const xp = xS(cpa).toFixed(1), yp = yS(rateNob(cpa)).toFixed(1);
+    pathNob += (i === 0 ? `M${xp},${yp}` : ` L${xp},${yp}`);
+  }
+  svg += `<path d="${pathNob}" stroke="#f5a623" stroke-width="2.5" fill="none" stroke-dasharray="8,5"/>`;
+
+  // 現在CPA縦線
+  const xCur = xS(cpaCur);
+  svg += `<line x1="${xCur.toFixed(1)}" y1="${pad.top}" x2="${xCur.toFixed(1)}" y2="${pad.top+gH}" stroke="#1a1a2e" stroke-width="1.5" stroke-dasharray="4,3" opacity=".6"/>`;
+
+  // 現在CPAの点
+  const yCurBon = yS(rateBon(cpaCur));
+  const yCurNob = yS(rateNob(cpaCur));
+  svg += `<circle cx="${xCur.toFixed(1)}" cy="${yCurBon.toFixed(1)}" r="5" fill="#4f7cf9" stroke="#fff" stroke-width="2"/>`;
+  svg += `<circle cx="${xCur.toFixed(1)}" cy="${yCurNob.toFixed(1)}" r="5" fill="#f5a623" stroke="#fff" stroke-width="2"/>`;
+  svg += `<text x="${(+xCur+4).toFixed(1)}" y="${(pad.top+20).toFixed(1)}" font-size="9" fill="#1a1a2e" font-weight="700">現在</text>`;
+
+  // 軸タイトル
+  svg += `<text x="${(pad.left+gW/2).toFixed(0)}" y="${H-2}" text-anchor="middle" font-size="9" fill="#bbb">ボーナスあり グロスCPA →</text>`;
+  svg += `<text x="10" y="${(pad.top+gH/2).toFixed(0)}" text-anchor="middle" font-size="9" fill="#bbb" transform="rotate(-90,10,${(pad.top+gH/2).toFixed(0)})">有効粗利率 →</text>`;
+
+  $('graph').setAttribute('viewBox', `0 0 ${W} ${H}`);
+  $('graph').innerHTML = svg;
+}
+
+['gross','targetCpa','margin','bonus'].forEach(id => $(id).addEventListener('input', update));
+$('cpa-slider').addEventListener('input', update);
+update();
+</script>
+</body>
+</html>

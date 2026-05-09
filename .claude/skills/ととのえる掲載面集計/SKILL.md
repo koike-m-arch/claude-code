@@ -124,6 +124,26 @@ Outbrain の管理API（`/marketers/{id}/campaigns`）と reporting API（`/repo
 `campaigns/periodic` の `campaignId` は **`reports/campaigns` の `metadata.id`** と一致する。
 そのため `buildCampaignMap` は `/reports/marketers/{id}/campaigns?from=&to=` を使い、`metadata.id → metadata.name` でマップを作る。
 
+---
+
+## 個別CPN掲載面フィルタの仕組み（重要）
+
+sections / publishers API は結果の `metadata` に `campaignId` が含まれないため、JS側フィルタ不可。
+CPN別データを取るには `periodic` エンドポイント（`campaignResults[].results[]` 構造）を使う必要がある。
+
+**ととのえるマーケターでの実績：`publishers/periodic` が 500 を返すことがある。**
+
+そのため `getSectionData` は CPN指定時に以下の順で試行する：
+
+| 順序 | エンドポイント | 構造 | CPN絞り込み方法 |
+|---|---|---|---|
+| [0] | `sections/periodic` | パターンB `campaignResults[]` | JS側で `camp.campaignId !== targetCpnId` |
+| [1] | `publishers/periodic` | パターンB `campaignResults[]` | JS側で `camp.campaignId !== targetCpnId` |
+| [2] | `sections?&campaignId=ID` | パターンA `results[]` | サーバー側フィルタ（効く場合あり） |
+| [3] | `publishers?&campaignId=ID` | パターンA `results[]` | サーバー側フィルタ（効く場合あり） |
+
+全体表示時は従来通り `sections` → `publishers` → `publishers/periodic` の順。
+
 ## 他商材との比較
 
 | 項目 | ブリリオ | ホワイト | ととのえる（山忠） |
